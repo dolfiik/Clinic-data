@@ -484,11 +484,11 @@ class TriageDataGenerator:
 
             #realistyczny rozklad kategorii triazu
             desired_triage_distribution = {
-                1: 0.10, #10% dla kategeorii 1
+                1: 0.15, #10% dla kategeorii 1
                 2: 0.25, #25% dla 2
-                3: 0.40, #40% dla 3
+                3: 0.30, #40% dla 3
                 4: 0.20, #20% dla 4
-                5: 0.05 #5% dla 5
+                5: 0.10 #5% dla 5
             }
 
             department_capacities = {dept: DEPARTMENT_CAPACITY.get(dept, 30) for dept in DEPARTMENTS}
