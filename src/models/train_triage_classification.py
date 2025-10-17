@@ -1,15 +1,3 @@
-"""
-ULEPSZONE TRENOWANIE MODELU KLASYFIKACJI TRIAŻY
-Cel: Zwiększenie accuracy z 60% do >80%
-
-Główne ulepszenia:
-1. SMOTETomek zamiast zwykłego SMOTE (lepszy balans + czyszczenie)
-2. Dostosowane wagi klas (kara za błędne klasyfikacje)
-3. Stratyfikowane dzielenie z oversampling tylko na zbiorze treningowym
-4. Więcej parametrów modelu (hyperparameter tuning)
-5. Analiza feature importance i selekcja cech
-"""
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -20,7 +8,6 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-# Zaawansowane techniki balansowania
 from imblearn.combine import SMOTETomek
 from imblearn.over_sampling import BorderlineSMOTE, ADASYN
 
@@ -41,9 +28,6 @@ warnings.filterwarnings('ignore')
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
-# ============================================================================
-# KONFIGURACJA
-# ============================================================================
 DATA_PATH = Path('/home/dolfik/Projects/Clinic-data/data/processed/')
 MODEL_PATH = Path('/home/dolfik/Projects/Clinic-data/models/')
 RESULTS_PATH = Path('/home/dolfik/Projects/Clinic-data/results/')
@@ -54,9 +38,6 @@ RESULTS_PATH.mkdir(parents=True, exist_ok=True)
 RANDOM_STATE = 42
 SAVE_PLOTS = True
 
-# ============================================================================
-# FUNKCJE POMOCNICZE
-# ============================================================================
 
 def print_header(text):
     """Wyświetla sformatowany nagłówek"""
@@ -75,14 +56,13 @@ def analyze_class_distribution(y, dataset_name="Dataset"):
         bar = "█" * int(pct / 2)
         print(f"  Kategoria {int(cat)}: {count:>4} ({pct:>5.1f}%) {bar}")
     
-    # Oblicz współczynnik nierównowagi (imbalance ratio)
     max_count = counts.max()
     min_count = counts.min()
     imbalance_ratio = max_count / min_count
     print(f"\n  Współczynnik nierównowagi: {imbalance_ratio:.2f}x")
     
     if imbalance_ratio > 3:
-        print("  ⚠️  UWAGA: Duża nierównowaga klas! Wymagany SMOTE/oversampling")
+        print(" UWAGA: Duża nierównowaga klas! Wymagany SMOTE/oversampling")
     
     return dict(zip(unique, counts))
 
@@ -90,12 +70,10 @@ def plot_confusion_matrix(y_true, y_pred, model_name, save=True):
     """Tworzy i wyświetla confusion matrix"""
     cm = confusion_matrix(y_true, y_pred)
     
-    # Oblicz procenty
     cm_pct = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis] * 100
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
     
-    # Liczby bezwzględne
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
                 xticklabels=['1','2','3','4','5'], 
                 yticklabels=['1','2','3','4','5'], ax=ax1)
@@ -235,7 +213,6 @@ def compare_models(results_dict):
     # Znajdź najlepszy model (wg Balanced Accuracy dla niezbalansowanych klas)
     best_model = df_comparison.loc[df_comparison['Balanced Acc'].idxmax(), 'Model']
     best_bacc = df_comparison['Balanced Acc'].max()
-    print(f"\n🏆 Najlepszy model: {best_model} (Balanced Accuracy: {best_bacc:.4f})")
     
     return best_model
 
@@ -260,14 +237,11 @@ def save_model(model, model_name, metrics):
     
     print(f"Metryki zapisane: {metrics_filename}")
 
-# ============================================================================
-# GŁÓWNA FUNKCJA TRENINGOWA
-# ============================================================================
 
 def main():
     """Główna funkcja trenująca model"""
     
-    print_header("ULEPSZONE TRENOWANIE MODELU KLASYFIKACJI TRIAŻY")
+    print_header("Ulepszone trenowanie modelu triaży")
     print(f"Data rozpoczęcia: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # ========================================================================
@@ -305,31 +279,18 @@ def main():
         print(f"  Testowy:     {X_test.shape[0]:>5} próbek × {X_test.shape[1]:>3} cech")
         
     except FileNotFoundError as e:
-        print("\n❌ Błąd: nie znaleziono plików z danymi")
+        print("\n Błąd: nie znaleziono plików z danymi")
         print(f"   Szczegóły: {e}")
         return
     
-    # ========================================================================
-    # 2. ANALIZA ROZKŁADU KLAS
-    # ========================================================================
     print_header("Analiza rozkładu klas")
     
     train_dist = analyze_class_distribution(y_train, "Treningowy (przed oversampling)")
     test_dist = analyze_class_distribution(y_test, "Testowy")
     
-    # ========================================================================
-    # 3. BALANSOWANIE KLAS - SMOTETomek
-    # ========================================================================
     print_header("Balansowanie klas - SMOTETomek")
     
-    print("\n📊 Metoda: SMOTETomek")
-    print("   = SMOTE (syntetyczne przykłady) + Tomek Links (czyszczenie granic)")
-    print("   Zalety:")
-    print("   • Tworzy nowe przykłady dla klas mniejszościowych")
-    print("   • Usuwa przypadki na granicy klas (zmniejsza szum)")
-    print("   • Lepsze wyniki niż sam SMOTE")
-    
-    print(f"\n⏳ Przed balansowaniem: {X_train.shape[0]} próbek")
+    print(f"\n Przed balansowaniem: {X_train.shape[0]} próbek")
     
     # Wypróbuj różne metody balansowania
     balancing_methods = {
@@ -338,20 +299,15 @@ def main():
         'ADASYN': ADASYN(random_state=RANDOM_STATE)
     }
     
-    # Użyj SMOTETomek jako domyślnego
     resampler = balancing_methods['SMOTETomek']
     
     X_train_balanced, y_train_balanced = resampler.fit_resample(X_train, y_train)
     
-    print(f"✓ Po balansowaniu:  {X_train_balanced.shape[0]} próbek")
+    print(f" Po balansowaniu:  {X_train_balanced.shape[0]} próbek")
     analyze_class_distribution(y_train_balanced, "Treningowy (po oversampling)")
     
-    # ========================================================================
-    # 4. OBLICZANIE WAG KLAS
-    # ========================================================================
     print_header("Obliczanie wag klas")
     
-    # Oblicz wagi dla każdej klasy (dodatkowa ochrona)
     class_weights = compute_class_weight(
         class_weight='balanced',
         classes=np.unique(y_train_balanced),
@@ -363,14 +319,10 @@ def main():
     for cat, weight in class_weight_dict.items():
         print(f"  Kategoria {cat}: {weight:.3f}")
     
-    # ========================================================================
-    # 5. DEFINICJA I TRENING MODELI
-    # ========================================================================
     print_header("Definicja modeli")
     
     feature_names = X_train_balanced.columns.tolist()
     
-    # Ulepszone parametry dla Random Forest
     print("\n🔍 Hyperparameter tuning dla Random Forest...")
     param_grid = {
         'n_estimators': [200, 300, 400],
@@ -386,29 +338,25 @@ def main():
         max_features='sqrt'
     )
     
-    # Użyj StratifiedKFold dla lepszej walidacji
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
     
     grid_search = GridSearchCV(
         rf_base, 
         param_grid, 
         cv=cv,
-        scoring='balanced_accuracy',  # Lepsze dla niezbalansowanych klas
+        scoring='balanced_accuracy',  
         n_jobs=-1,
         verbose=2
     )
     
-    print("⏳ Trening w toku (może potrwać kilka minut)...")
     grid_search.fit(X_train_balanced, y_train_balanced)
     
-    print(f"\n✓ Najlepsze parametry Random Forest:")
     for param, value in grid_search.best_params_.items():
         print(f"    {param}: {value}")
     print(f"  Best CV Score: {grid_search.best_score_:.4f}")
     
     best_rf = grid_search.best_estimator_
     
-    # Dodatkowe modele
     models = {}
     models['Random Forest'] = best_rf
     
@@ -441,31 +389,23 @@ def main():
     )
     models['Ensemble (Weighted)'] = ensemble
     
-    # ========================================================================
-    # 6. EWALUACJA MODELI
-    # ========================================================================
     results = {}
     trained_models = {}
     
     for model_name, model in models.items():
         print_header(f"Trening i ewaluacja: {model_name}")
         
-        # Trening (jeśli nie jest już wytrenowany)
         if model_name != 'Random Forest':
-            print("⏳ Trening w toku...")
             model.fit(X_train_balanced, y_train_balanced)
-            print("✓ Trening zakończony")
         
         trained_models[model_name] = model
         
-        # Ewaluacja na wszystkich zbiorach
         results[model_name] = {
             'train': evaluate_model(model, X_train_balanced, y_train_balanced, "Treningowy"),
             'val': evaluate_model(model, X_val, y_val, "Walidacyjny"),
             'test': evaluate_model(model, X_test, y_test, "Testowy")
         }
         
-        # Wykresy
         if SAVE_PLOTS:
             plot_confusion_matrix(
                 y_test, 
@@ -477,51 +417,20 @@ def main():
         if SAVE_PLOTS and model_name in ['Random Forest', 'Gradient Boosting']:
             plot_feature_importance(model, feature_names, model_name, top_n=20, save=True)
     
-    # ========================================================================
-    # 7. PORÓWNANIE I WYBÓR NAJLEPSZEGO MODELU
-    # ========================================================================
     best_model_name = compare_models(results)
     best_model = trained_models[best_model_name]
     
-    # ========================================================================
-    # 8. SZCZEGÓŁOWA ANALIZA NAJLEPSZEGO MODELU
-    # ========================================================================
     print_header(f"Szczegółowa analiza najlepszego modelu: {best_model_name}")
     
     best_metrics = results[best_model_name]['test']
     
-    print(f"\n🎯 Metryki finalne na zbiorze testowym:")
+    print(f"\n Metryki finalne na zbiorze testowym:")
     print(f"   Accuracy:          {best_metrics['accuracy']:.2%}")
     print(f"   Balanced Accuracy: {best_metrics['balanced_accuracy']:.2%}")
     print(f"   F1-Score:          {best_metrics['f1_score']:.2%}")
     
-    # Porównanie z poprzednim modelem
-    print(f"\n📊 Porównanie z poprzednim modelem:")
-    print(f"   Poprzedni:  60.89% accuracy")
-    print(f"   Obecny:     {best_metrics['accuracy']:.2%}")
-    improvement = (best_metrics['accuracy'] - 0.6089) * 100
-    print(f"   Poprawa:    {improvement:+.2f} punktów procentowych")
-    
-    if best_metrics['balanced_accuracy'] >= 0.80:
-        print(f"\n✅ CEL OSIĄGNIĘTY! Balanced Accuracy >= 80%")
-    elif best_metrics['balanced_accuracy'] >= 0.75:
-        print(f"\n⚠️  Blisko celu. Balanced Accuracy: {best_metrics['balanced_accuracy']:.2%}")
-        print(f"   Sugestie dalszych ulepszeń:")
-        print(f"   • Dodaj więcej cech (GCS, poziom bólu, etc.)")
-        print(f"   • Wygeneruj więcej danych treningowych")
-        print(f"   • Spróbuj XGBoost lub LightGBM")
-    else:
-        print(f"\n❌ Cel nie osiągnięty. Potrzebne dalsze ulepszenia.")
-    
-    # ========================================================================
-    # 9. ZAPIS MODELU
-    # ========================================================================
     print_header("Zapis modelu")
     save_model(best_model, best_model_name, results[best_model_name])
     
-    print("\n" + "="*70)
-    print("✅ TRENING ZAKOŃCZONY SUKCESEM!")
-    print("="*70)
-
 if __name__ == "__main__":
     main()

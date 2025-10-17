@@ -1,271 +1,270 @@
-"""
-ULEPSZONE SZABLONY PRZYPADKÓW MEDYCZNYCH
-Dodane cechy:
-- GCS (Glasgow Coma Scale) 
-- Poziom bólu (0-10)
-- Częstotliwość oddechów
-- Czas od początku objawów
-- WYRAŹNIEJSZE różnice między kategoriami triażu
-"""
-
 DEPARTMENTS = [
-    "SOR",
-    "Interna",
-    "Kardiologia",
-    "Chirurgia",
-    "Ortopedia",
-    "Neurologia",
-    "Pediatria",
-    "Ginekologia"
+    "SOR", "Interna", "Kardiologia", "Chirurgia",
+    "Ortopedia", "Neurologia", "Pediatria", "Ginekologia"
 ]
 
 DEPARTMENT_CAPACITY = {
-    "SOR": 25,
-    "Interna": 50,
-    "Kardiologia": 30,
-    "Chirurgia": 35,
-    "Ortopedia": 25,
-    "Neurologia": 20,
-    "Pediatria": 30,
-    "Ginekologia": 20
+    "SOR": 25, "Interna": 50, "Kardiologia": 30, "Chirurgia": 35,
+    "Ortopedia": 25, "Neurologia": 20, "Pediatria": 30, "Ginekologia": 20
 }
 
-# Szablony z dodatkowymi parametrami i WYRAŹNIEJSZYMI różnicami
 MEDICAL_CASE_TEMPLATES = {
     
-    "zawał_serca": {
-        "demografia": {"wiek": (45, 85), "płeć_M": 0.65},
+    "zawał_STEMI": {
+        "demografia": {"wiek": (45, 85), "płeć_M": 0.7},
         "parametry": {
-            "tętno": (50, 140),
-            "ciśnienie_skurczowe": (80, 180),
-            "ciśnienie_rozkurczowe": (40, 110),
+            "tętno": (80, 160),           
+            "ciśnienie_skurczowe": (70, 140),  
+            "ciśnienie_rozkurczowe": (40, 80),
             "temperatura": (36.0, 38.0),
-            "saturacja": (85, 98),
-            "GCS": (13, 15),  # NOWE
-            "ból": (7, 10),   # NOWE - silny ból!
-            "częstotliwość_oddechów": (16, 28),  # NOWE
-            "czas_od_objawów_h": (0.5, 6)  # NOWE - czas krytyczny
+            "saturacja": (80, 96),         
+            "GCS": (8, 15),              
+            "ból": (7, 10),
+            "częstotliwość_oddechów": (18, 40),
+            "czas_od_objawów_h": (0.5, 6)
         },
-        "objawy": ["ból w klatce piersiowej", "duszność", "wymioty", "bladość", "pocenie się"],
-        # KLUCZOWE: Wyraźne różnice w prawdopodobieństwach
-        "prawdopodobieństwa_triażu": [0.85, 0.15, 0.0, 0.0, 0.0],  # 85% kat 1!
-        "choroby_współistniejące": {
-            "nadciśnienie": 0.7,
-            "cukrzyca": 0.4,
-            "otyłość": 0.5
-        },
-        "typ": "kardiologiczny",
+        "prawdopodobieństwa_triażu": [0.85, 0.12, 0.03, 0.0, 0.0],  
         "oddział_docelowy": ["Kardiologia", "SOR"]
     },
     
-    "udar_mózgu": {
-        "demografia": {"wiek": (50, 90), "płeć_M": 0.55},
+    "udar_ciężki": {
+        "demografia": {"wiek": (55, 90), "płeć_M": 0.55},
         "parametry": {
-            "tętno": (60, 120),
-            "ciśnienie_skurczowe": (140, 220),
-            "ciśnienie_rozkurczowe": (80, 130),
-            "temperatura": (36.0, 38.0),
-            "saturacja": (90, 100),
-            "GCS": (8, 15),  # NOWE - może być obniżone!
-            "ból": (0, 6),   # NOWE - nie zawsze boli
-            "częstotliwość_oddechów": (12, 24),
-            "czas_od_objawów_h": (0.5, 4.5)  # Golden hour!
+            "tętno": (50, 130),
+            "ciśnienie_skurczowe": (140, 240),
+            "ciśnienie_rozkurczowe": (80, 140),
+            "temperatura": (36.0, 38.5),
+            "saturacja": (85, 98),         
+            "GCS": (5, 14),               
+            "ból": (0, 7),
+            "częstotliwość_oddechów": (8, 32),
+            "czas_od_objawów_h": (0.5, 6)
         },
-        "objawy": ["niedowład", "zaburzenia mowy", "zawroty głowy", "zaburzenia świadomości"],
-        "prawdopodobieństwa_triażu": [0.80, 0.18, 0.02, 0.0, 0.0],  # 80% kat 1
-        "choroby_współistniejące": {
-            "nadciśnienie": 0.8,
-            "migotanie przedsionków": 0.3,
-            "cukrzyca": 0.4
-        },
-        "typ": "neurologiczny",
+        "prawdopodobieństwa_triażu": [0.80, 0.15, 0.05, 0.0, 0.0],
         "oddział_docelowy": ["Neurologia", "SOR"]
     },
     
-    "zapalenie_wyrostka": {
-        "demografia": {"wiek": (5, 50), "płeć_M": 0.5},
+    "uraz_wielonarządowy": {
+        "demografia": {"wiek": (15, 65), "płeć_M": 0.75},
         "parametry": {
-            "tętno": (80, 120),
-            "ciśnienie_skurczowe": (100, 140),
-            "ciśnienie_rozkurczowe": (60, 90),
-            "temperatura": (37.5, 39.5),
-            "saturacja": (96, 100),
-            "GCS": (14, 15),  # Przytomny
-            "ból": (6, 9),    # Silny ból brzucha
-            "częstotliwość_oddechów": (16, 24),
-            "czas_od_objawów_h": (6, 48)
+            "tętno": (100, 160),
+            "ciśnienie_skurczowe": (60, 110),
+            "ciśnienie_rozkurczowe": (30, 70),
+            "temperatura": (34.0, 37.0),
+            "saturacja": (70, 92),
+            "GCS": (3, 12),
+            "ból": (7, 10),
+            "częstotliwość_oddechów": (20, 45),
+            "czas_od_objawów_h": (0.25, 3)
         },
-        "objawy": ["ból brzucha", "nudności", "wymioty", "gorączka", "brak apetytu"],
-        "prawdopodobieństwa_triażu": [0.05, 0.70, 0.25, 0.0, 0.0],  # 70% kat 2
-        "choroby_współistniejące": {},
-        "typ": "chirurgiczny",
-        "oddział_docelowy": ["Chirurgia", "SOR"]
-    },
-    
-    "zapalenie_płuc": {
-        "demografia": {"wiek": (1, 90), "płeć_M": 0.5},
-        "parametry": {
-            "tętno": (80, 130),
-            "ciśnienie_skurczowe": (90, 150),
-            "ciśnienie_rozkurczowe": (50, 90),
-            "temperatura": (38.0, 40.0),
-            "saturacja": (88, 96),
-            "GCS": (13, 15),
-            "ból": (3, 7),    # Ból przy oddychaniu
-            "częstotliwość_oddechów": (20, 35),  # Przyspieszone!
-            "czas_od_objawów_h": (12, 96)
-        },
-        "objawy": ["kaszel", "gorączka", "duszność", "ból w klatce piersiowej", "osłabienie"],
-        "prawdopodobieństwa_triażu": [0.10, 0.50, 0.35, 0.05, 0.0],  # 50% kat 2
-        "choroby_współistniejące": {
-            "POChP": 0.3,
-            "astma": 0.2
-        },
-        "typ": "internistyczny",
-        "oddział_docelowy": ["Interna", "SOR"]
-    },
-    
-    "złamanie_kończyny": {
-        "demografia": {"wiek": (5, 80), "płeć_M": 0.6},
-        "parametry": {
-            "tętno": (70, 110),
-            "ciśnienie_skurczowe": (100, 150),
-            "ciśnienie_rozkurczowe": (60, 90),
-            "temperatura": (36.5, 37.5),
-            "saturacja": (96, 100),
-            "GCS": (15, 15),  # Przytomny
-            "ból": (6, 10),   # Bardzo boli!
-            "częstotliwość_oddechów": (14, 20),
-            "czas_od_objawów_h": (0.5, 24)
-        },
-        "objawy": ["ból", "obrzęk", "ograniczenie ruchu", "deformacja", "sine"],
-        "prawdopodobieństwa_triażu": [0.0, 0.15, 0.65, 0.20, 0.0],  # 65% kat 3
-        "choroby_współistniejące": {
-            "osteoporoza": 0.3
-        },
-        "typ": "urazowy",
-        "oddział_docelowy": ["Ortopedia", "SOR"]
-    },
-    
-    "ból_brzucha": {
-        "demografia": {"wiek": (10, 70), "płeć_M": 0.45},
-        "parametry": {
-            "tętno": (70, 100),
-            "ciśnienie_skurczowe": (100, 140),
-            "ciśnienie_rozkurczowe": (60, 90),
-            "temperatura": (36.5, 38.0),
-            "saturacja": (96, 100),
-            "GCS": (15, 15),
-            "ból": (3, 7),    # Umiarkowany
-            "częstotliwość_oddechów": (14, 20),
-            "czas_od_objawów_h": (2, 48)
-        },
-        "objawy": ["ból brzucha", "nudności", "wzdęcia", "biegunka"],
-        "prawdopodobieństwa_triażu": [0.0, 0.05, 0.35, 0.50, 0.10],  # 50% kat 4
-        "choroby_współistniejące": {
-            "zespół jelita drażliwego": 0.2
-        },
-        "typ": "internistyczny",
-        "oddział_docelowy": ["Interna", "SOR"]
-    },
-    
-    "infekcja_górnych_dróg_oddechowych": {
-        "demografia": {"wiek": (1, 60), "płeć_M": 0.5},
-        "parametry": {
-            "tętno": (70, 95),
-            "ciśnienie_skurczowe": (100, 130),
-            "ciśnienie_rozkurczowe": (60, 85),
-            "temperatura": (37.0, 38.5),
-            "saturacja": (96, 100),
-            "GCS": (15, 15),
-            "ból": (1, 4),    # Łagodny
-            "częstotliwość_oddechów": (14, 20),
-            "czas_od_objawów_h": (24, 120)
-        },
-        "objawy": ["kaszel", "katar", "ból gardła", "gorączka", "osłabienie"],
-        "prawdopodobieństwa_triażu": [0.0, 0.0, 0.05, 0.30, 0.65],  # 65% kat 5!
-        "choroby_współistniejące": {},
-        "typ": "internistyczny",
-        "oddział_docelowy": ["Interna", "SOR"]
-    },
-    
-    "uraz_wielonarzadowy": {
-        "demografia": {"wiek": (15, 60), "płeć_M": 0.7},
-        "parametry": {
-            "tętno": (100, 150),
-            "ciśnienie_skurczowe": (70, 120),
-            "ciśnienie_rozkurczowe": (40, 80),
-            "temperatura": (35.5, 37.0),
-            "saturacja": (80, 95),
-            "GCS": (5, 14),   # NOWE - obniżone!
-            "ból": (8, 10),   # Ekstremalny
-            "częstotliwość_oddechów": (20, 40),  # Krytyczne
-            "czas_od_objawów_h": (0.25, 2)  # Bardzo niedawno
-        },
-        "objawy": ["urazy wielonarządowe", "krwawienie", "zaburzenia świadomości", "wstrząs"],
-        "prawdopodobieństwa_triażu": [0.95, 0.05, 0.0, 0.0, 0.0],  # 95% kat 1!!!
-        "choroby_współistniejące": {},
-        "typ": "urazowy",
+        "prawdopodobieństwa_triażu": [0.90, 0.08, 0.02, 0.0, 0.0],
         "oddział_docelowy": ["SOR", "Chirurgia"]
     },
     
-    "migraine": {
-        "demografia": {"wiek": (15, 60), "płeć_M": 0.3},
+    "zapalenie_płuc_ciężkie": {
+        "demografia": {"wiek": (30, 85), "płeć_M": 0.5},
         "parametry": {
-            "tętno": (70, 95),
-            "ciśnienie_skurczowe": (100, 140),
-            "ciśnienie_rozkurczowe": (60, 90),
-            "temperatura": (36.5, 37.5),
+            "tętno": (85, 130),           
+            "ciśnienie_skurczowe": (95, 150),
+            "ciśnienie_rozkurczowe": (55, 95),
+            "temperatura": (37.5, 40.5),
+            "saturacja": (84, 95),       
+            "GCS": (13, 15),
+            "ból": (4, 8),
+            "częstotliwość_oddechów": (22, 35),
+            "czas_od_objawów_h": (8, 72)
+        },
+        "prawdopodobieństwa_triażu": [0.08, 0.80, 0.10, 0.02, 0.0],  
+        "oddział_docelowy": ["Interna", "SOR"]
+    },
+    
+    "zapalenie_wyrostka": {
+        "demografia": {"wiek": (8, 55), "płeć_M": 0.5},
+        "parametry": {
+            "tętno": (75, 120),
+            "ciśnienie_skurczowe": (100, 145),
+            "ciśnienie_rozkurczowe": (65, 95),
+            "temperatura": (37.0, 39.5),
+            "saturacja": (94, 100),
+            "GCS": (14, 15),
+            "ból": (5, 9),
+            "częstotliwość_oddechów": (14, 26),
+            "czas_od_objawów_h": (4, 48)
+        },
+        "prawdopodobieństwa_triażu": [0.05, 0.85, 0.08, 0.02, 0.0],
+        "oddział_docelowy": ["Chirurgia", "SOR"]
+    },
+    
+    "silne_krwawienie": {
+        "demografia": {"wiek": (18, 75), "płeć_M": 0.6},
+        "parametry": {
+            "tętno": (85, 130),
+            "ciśnienie_skurczowe": (85, 130),
+            "ciśnienie_rozkurczowe": (55, 85),
+            "temperatura": (36.0, 37.5),
+            "saturacja": (90, 98),
+            "GCS": (13, 15),
+            "ból": (5, 9),
+            "częstotliwość_oddechów": (16, 28),
+            "czas_od_objawów_h": (0.5, 12)
+        },
+        "prawdopodobieństwa_triażu": [0.10, 0.82, 0.08, 0.0, 0.0],
+        "oddział_docelowy": ["Chirurgia", "SOR"]
+    },
+    
+    "złamanie_proste": {
+        "demografia": {"wiek": (8, 75), "płeć_M": 0.6},
+        "parametry": {
+            "tętno": (65, 105),            
+            "ciśnienie_skurczowe": (100, 145),
+            "ciśnienie_rozkurczowe": (65, 95),
+            "temperatura": (36.3, 37.8),
+            "saturacja": (95, 100),
+            "GCS": (15, 15),
+            "ból": (4, 8),
+            "częstotliwość_oddechów": (12, 22),
+            "czas_od_objawów_h": (0.5, 48)
+        },
+        "prawdopodobieństwa_triażu": [0.0, 0.10, 0.80, 0.10, 0.0],  
+        "oddział_docelowy": ["Ortopedia", "SOR"]
+    },
+    
+    "infekcja_moczu": {
+        "demografia": {"wiek": (18, 85), "płeć_M": 0.25},
+        "parametry": {
+            "tętno": (70, 100),
+            "ciśnienie_skurczowe": (105, 145),
+            "ciśnienie_rozkurczowe": (65, 95),
+            "temperatura": (37.0, 39.0),
+            "saturacja": (95, 100),
+            "GCS": (15, 15),
+            "ból": (3, 7),
+            "częstotliwość_oddechów": (12, 20),
+            "czas_od_objawów_h": (12, 96)
+        },
+        "prawdopodobieństwa_triażu": [0.0, 0.05, 0.85, 0.10, 0.0],
+        "oddział_docelowy": ["Interna", "SOR"]
+    },
+    
+    "zaostrzenie_astmy": {
+        "demografia": {"wiek": (12, 65), "płeć_M": 0.45},
+        "parametry": {
+            "tętno": (75, 115),
+            "ciśnienie_skurczowe": (105, 140),
+            "ciśnienie_rozkurczowe": (65, 90),
+            "temperatura": (36.5, 37.8),
+            "saturacja": (88, 96),        
+            "GCS": (15, 15),
+            "ból": (2, 6),
+            "częstotliwość_oddechów": (18, 32),
+            "czas_od_objawów_h": (1, 24)
+        },
+        "prawdopodobieństwa_triażu": [0.0, 0.15, 0.75, 0.10, 0.0],  
+        "oddział_docelowy": ["Interna", "SOR"]
+    },
+    
+    "ból_brzucha_łagodny": {
+        "demografia": {"wiek": (12, 70), "płeć_M": 0.45},
+        "parametry": {
+            "tętno": (60, 95),             
+            "ciśnienie_skurczowe": (105, 140),
+            "ciśnienie_rozkurczowe": (65, 90),
+            "temperatura": (36.5, 38.0),
             "saturacja": (96, 100),
             "GCS": (15, 15),
-            "ból": (6, 9),    # Silny ból głowy
+            "ból": (2, 6),
+            "częstotliwość_oddechów": (12, 20),
+            "czas_od_objawów_h": (4, 72)
+        },
+        "prawdopodobieństwa_triażu": [0.0, 0.0, 0.15, 0.80, 0.05],  
+        "oddział_docelowy": ["Interna", "SOR"]
+    },
+    
+    "skręcenie_lekkie": {
+        "demografia": {"wiek": (12, 55), "płeć_M": 0.55},
+        "parametry": {
+            "tętno": (60, 90),
+            "ciśnienie_skurczowe": (105, 135),
+            "ciśnienie_rozkurczowe": (65, 88),
+            "temperatura": (36.4, 37.2),
+            "saturacja": (97, 100),
+            "GCS": (15, 15),
+            "ból": (2, 7),
             "częstotliwość_oddechów": (12, 18),
-            "czas_od_objawów_h": (2, 24)
+            "czas_od_objawów_h": (1, 72)
         },
-        "objawy": ["silny ból głowy", "światłowstręt", "nudności", "wymioty"],
-        "prawdopodobieństwa_triażu": [0.0, 0.0, 0.20, 0.60, 0.20],  # 60% kat 4
-        "choroby_współistniejące": {
-            "migrena": 0.8
+        "prawdopodobieństwa_triażu": [0.0, 0.0, 0.12, 0.83, 0.05],
+        "oddział_docelowy": ["Ortopedia", "SOR"]
+    },
+    
+    "migrena": {
+        "demografia": {"wiek": (16, 60), "płeć_M": 0.3},
+        "parametry": {
+            "tętno": (65, 95),
+            "ciśnienie_skurczowe": (100, 140),
+            "ciśnienie_rozkurczowe": (60, 90),
+            "temperatura": (36.4, 37.3),
+            "saturacja": (97, 100),
+            "GCS": (15, 15),
+            "ból": (5, 9),                 
+            "częstotliwość_oddechów": (12, 18),
+            "czas_od_objawów_h": (2, 48)
         },
-        "typ": "neurologiczny",
+        "prawdopodobieństwa_triażu": [0.0, 0.0, 0.10, 0.85, 0.05],
         "oddział_docelowy": ["Neurologia", "SOR"]
     },
     
-    "skręcenie_stawu": {
-        "demografia": {"wiek": (10, 50), "płeć_M": 0.6},
+    "przeziębienie": {
+        "demografia": {"wiek": (3, 65), "płeć_M": 0.5},
         "parametry": {
-            "tętno": (70, 90),
-            "ciśnienie_skurczowe": (100, 130),
-            "ciśnienie_rozkurczowe": (60, 85),
-            "temperatura": (36.5, 37.0),
-            "saturacja": (98, 100),
+            "tętno": (60, 85),
+            "ciśnienie_skurczowe": (105, 130),
+            "ciśnienie_rozkurczowe": (65, 85),
+            "temperatura": (36.5, 38.3),   
+            "saturacja": (96, 100),
             "GCS": (15, 15),
-            "ból": (4, 7),    # Umiarkowany
-            "częstotliwość_oddechów": (12, 16),
-            "czas_od_objawów_h": (1, 48)
+            "ból": (1, 4),
+            "częstotliwość_oddechów": (12, 18),
+            "czas_od_objawów_h": (24, 168)
         },
-        "objawy": ["ból", "obrzęk", "ograniczenie ruchu", "siniaki"],
-        "prawdopodobieństwa_triażu": [0.0, 0.0, 0.10, 0.50, 0.40],  # 50% kat 4
-        "choroby_współistniejące": {},
-        "typ": "urazowy",
-        "oddział_docelowy": ["Ortopedia", "SOR"]
+        "prawdopodobieństwa_triażu": [0.0, 0.0, 0.0, 0.15, 0.85],  
+        "oddział_docelowy": ["Interna", "SOR"]
+    },
+    
+    "kontrola": {
+        "demografia": {"wiek": (18, 80), "płeć_M": 0.5},
+        "parametry": {
+            "tętno": (58, 80),
+            "ciśnienie_skurczowe": (105, 135),
+            "ciśnienie_rozkurczowe": (65, 88),
+            "temperatura": (36.3, 37.2),
+            "saturacja": (97, 100),
+            "GCS": (15, 15),
+            "ból": (0, 2),
+            "częstotliwość_oddechów": (12, 16),
+            "czas_od_objawów_h": (168, 720)
+        },
+        "prawdopodobieństwa_triażu": [0.0, 0.0, 0.0, 0.10, 0.90],
+        "oddział_docelowy": ["Interna"]
+    },
+    
+    "receptura": {
+        "demografia": {"wiek": (25, 85), "płeć_M": 0.5},
+        "parametry": {
+            "tętno": (58, 78),
+            "ciśnienie_skurczowe": (108, 132),
+            "ciśnienie_rozkurczowe": (68, 86),
+            "temperatura": (36.4, 37.1),
+            "saturacja": (97, 100),
+            "GCS": (15, 15),
+            "ból": (0, 2),
+            "częstotliwość_oddechów": (12, 16),
+            "czas_od_objawów_h": (72, 360)
+        },
+        "prawdopodobieństwa_triażu": [0.0, 0.0, 0.0, 0.08, 0.92],
+        "oddział_docelowy": ["Interna", "SOR"]
     }
 }
 
-# Średni czas obsługi według kategorii
-TRIAGE_SERVICE_TIMES = {
-    1: 15,
-    2: 30,
-    3: 60,
-    4: 90,
-    5: 120
-}
-
-# Maksymalne czasy oczekiwania
-TRIAGE_WAIT_TIMES = {
-    1: 0,
-    2: 10,
-    3: 30,
-    4: 60,
-    5: 120
-}
+TRIAGE_SERVICE_TIMES = {1: 15, 2: 30, 3: 60, 4: 90, 5: 120}
+TRIAGE_WAIT_TIMES = {1: 0, 2: 10, 3: 30, 4: 60, 5: 120}

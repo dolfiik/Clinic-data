@@ -1,17 +1,9 @@
-"""
-Skrypt do testowania wytrenowanego modelu triaży
-Używa rzeczywistych przypadków z zestawu testowego
-
-Użycie:
-    python test_model.py
-"""
 
 import pickle
 import pandas as pd
 import numpy as np
 from pathlib import Path
 
-# Ścieżki
 MODEL_PATH = Path('models/random_forest_20251017_123356.pkl')
 DATA_PATH = Path('data/processed/')
 
@@ -19,34 +11,25 @@ print("="*70)
 print("TESTOWANIE MODELU KLASYFIKACJI TRIAŻY")
 print("="*70)
 
-# Załaduj model
-print("\nŁadowanie modelu...")
 with open(MODEL_PATH, 'rb') as f:
     model = pickle.load(f)
 print(f"✓ Model załadowany: {MODEL_PATH}")
 
-# Załaduj dane testowe
 print("\nŁadowanie danych testowych...")
 X_test = pd.read_csv(DATA_PATH / 'X_test.csv')
 y_test = pd.read_csv(DATA_PATH / 'y_test.csv').values.ravel()
 
-# Usuń kolumny tekstowe jeśli są
 text_columns = X_test.select_dtypes(include=['object']).columns.tolist()
 if text_columns:
     X_test = X_test.drop(columns=text_columns)
 
 X_test = X_test.astype(float)
 
-print(f"✓ Dane testowe: {len(X_test)} przypadków")
-print(f"✓ Liczba cech: {X_test.shape[1]}")
+print(f" Dane testowe: {len(X_test)} przypadków")
+print(f" Liczba cech: {X_test.shape[1]}")
 
-# Załaduj oryginalne dane (przed przetworzeniem) żeby pokazać parametry
 df_original = pd.read_csv('data/raw/triage_data.csv')
 df_original['data_przyjęcia'] = pd.to_datetime(df_original['data_przyjęcia'])
-
-print("\n" + "="*70)
-print("ANALIZA LOSOWYCH PRZYPADKÓW Z ZESTAWU TESTOWEGO")
-print("="*70)
 
 # Wybierz losowe przypadki z każdej kategorii
 np.random.seed(42)
@@ -100,9 +83,9 @@ for test_idx, true_category in test_cases:
     
     # Sprawdź czy poprawnie
     if int(prediction) == int(true_category):
-        print("✓ POPRAWNA PREDYKCJA")
+        print(" POPRAWNA PREDYKCJA")
     else:
-        print("✗ BŁĘDNA PREDYKCJA")
+        print(" BŁĘDNA PREDYKCJA")
     
     print(f"\nPrawdopodobieństwa dla każdej kategorii:")
     for i, prob in enumerate(probabilities, 1):
@@ -111,15 +94,8 @@ for test_idx, true_category in test_cases:
         marker += " ← PRAWDZIWA" if i == true_category else ""
         print(f"  Kategoria {i}: {prob:6.2%} {bar}{marker}")
 
-# ============================================================================
-# STATYSTYKI OGÓLNE
-# ============================================================================
 
-print("\n" + "="*70)
-print("STATYSTYKI OGÓLNE NA ZBIORZE TESTOWYM")
-print("="*70)
 
-# Przewidywania dla całego zbioru testowego
 all_predictions = model.predict(X_test)
 
 # Accuracy
@@ -155,10 +131,6 @@ for cat, count in zip(unique, counts):
     bar = '█' * int(pct / 2)
     print(f"  Kategoria {int(cat)}: {count:>4} ({pct:>5.1f}%) {bar}")
 
-# ============================================================================
-# TRYB INTERAKTYWNY - znajdź konkretny przypadek
-# ============================================================================
-
 print("\n" + "="*70)
 print("WYSZUKIWANIE PRZYPADKÓW")
 print("="*70)
@@ -190,6 +162,3 @@ if user_input:
     except ValueError:
         print("Błąd: Nieprawidłowy indeks")
 
-print("\n" + "="*70)
-print("KONIEC TESTÓW")
-print("="*70)
