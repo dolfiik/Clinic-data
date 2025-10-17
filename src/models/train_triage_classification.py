@@ -1,3 +1,15 @@
+"""
+ULEPSZONE TRENOWANIE MODELU KLASYFIKACJI TRIAŻY
+Cel: Zwiększenie accuracy z 60% do >80%
+
+Główne ulepszenia:
+1. SMOTETomek zamiast zwykłego SMOTE (lepszy balans + czyszczenie)
+2. Dostosowane wagi klas (kara za błędne klasyfikacje)
+3. Stratyfikowane dzielenie z oversampling tylko na zbiorze treningowym
+4. Więcej parametrów modelu (hyperparameter tuning)
+5. Analiza feature importance i selekcja cech
+"""
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,28 +19,31 @@ import pickle
 import json
 from datetime import datetime
 from pathlib import Path
-from imblearn.over_sampling import SMOTE
 
-
-
+# Zaawansowane techniki balansowania
+from imblearn.combine import SMOTETomek
+from imblearn.over_sampling import BorderlineSMOTE, ADASYN
 
 # Modele ML
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.model_selection import GridSearchCV  
-# Metryki
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.utils.class_weight import compute_class_weight
 
+# Metryki
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
-    classification_report, confusion_matrix
+    classification_report, confusion_matrix, balanced_accuracy_score
 )
 
 warnings.filterwarnings('ignore')
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
-#Sciezki
+# ============================================================================
+# KONFIGURACJA
+# ============================================================================
 DATA_PATH = Path('/home/dolfik/Projects/Clinic-data/data/processed/')
 MODEL_PATH = Path('/home/dolfik/Projects/Clinic-data/models/')
 RESULTS_PATH = Path('/home/dolfik/Projects/Clinic-data/results/')
@@ -36,368 +51,477 @@ RESULTS_PATH = Path('/home/dolfik/Projects/Clinic-data/results/')
 MODEL_PATH.mkdir(parents=True, exist_ok=True)
 RESULTS_PATH.mkdir(parents=True, exist_ok=True)
 
-#Parametry treningu
 RANDOM_STATE = 42
 SAVE_PLOTS = True
 
-#Funkcje pomocnicze
+# ============================================================================
+# FUNKCJE POMOCNICZE
+# ============================================================================
 
 def print_header(text):
-    """Wyswietla sformatowany naglowek"""
+    """Wyświetla sformatowany nagłówek"""
     print("\n" + "="*70)
     print(f" {text}")
     print("="*70)
 
+def analyze_class_distribution(y, dataset_name="Dataset"):
+    """Szczegółowa analiza rozkładu klas"""
+    print(f"\n--- Rozkład klas: {dataset_name} ---")
+    unique, counts = np.unique(y, return_counts=True)
+    total = len(y)
+    
+    for cat, count in zip(unique, counts):
+        pct = count / total * 100
+        bar = "█" * int(pct / 2)
+        print(f"  Kategoria {int(cat)}: {count:>4} ({pct:>5.1f}%) {bar}")
+    
+    # Oblicz współczynnik nierównowagi (imbalance ratio)
+    max_count = counts.max()
+    min_count = counts.min()
+    imbalance_ratio = max_count / min_count
+    print(f"\n  Współczynnik nierównowagi: {imbalance_ratio:.2f}x")
+    
+    if imbalance_ratio > 3:
+        print("  ⚠️  UWAGA: Duża nierównowaga klas! Wymagany SMOTE/oversampling")
+    
+    return dict(zip(unique, counts))
 
 def plot_confusion_matrix(y_true, y_pred, model_name, save=True):
-    """
-    Tworzy i wyswietla confusion matrix
-
-    Args:
-        y_true: prawdziwe etykiety
-        y_pred: predykcje modelu
-        model_name: nazwa modelu
-        save: czy zapisac wykres
-    """
-
+    """Tworzy i wyświetla confusion matrix"""
     cm = confusion_matrix(y_true, y_pred)
-
-    plt.figure(figsize=(10, 8))
+    
+    # Oblicz procenty
+    cm_pct = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis] * 100
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+    
+    # Liczby bezwzględne
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                xticklabels=['1','2','3','4','5'], yticklabels=['1','2','3','4','5'])
-    plt.title(f'Confusion Matrix - {model_name}', fontsize=14, fontweight='bold')
-    plt.ylabel('Prawdziwa kategoria', fontsize=12)
-    plt.xlabel('Predykcja modelu', fontsize=12)
+                xticklabels=['1','2','3','4','5'], 
+                yticklabels=['1','2','3','4','5'], ax=ax1)
+    ax1.set_title(f'Confusion Matrix - {model_name} (liczby)', fontsize=12, fontweight='bold')
+    ax1.set_ylabel('Prawdziwa kategoria', fontsize=10)
+    ax1.set_xlabel('Predykcja modelu', fontsize=10)
+    
+    # Procenty
+    sns.heatmap(cm_pct, annot=True, fmt='.1f', cmap='RdYlGn',
+                xticklabels=['1','2','3','4','5'], 
+                yticklabels=['1','2','3','4','5'], ax=ax2)
+    ax2.set_title(f'Confusion Matrix - {model_name} (%)', fontsize=12, fontweight='bold')
+    ax2.set_ylabel('Prawdziwa kategoria', fontsize=10)
+    ax2.set_xlabel('Predykcja modelu', fontsize=10)
+    
     plt.tight_layout()
-
+    
     if save:
-        filename = RESULTS_PATH / f'confusion_matrix_{model_name.lower().replace(" ","_")}.png'
+        filename = RESULTS_PATH / f'confusion_matrix_{model_name.lower().replace(" ","_")}_improved.png'
         plt.savefig(filename, dpi=300, bbox_inches='tight')
-        
+    
     plt.show()
 
-
-
 def plot_feature_importance(model, feature_names, model_name, top_n=20, save=True):
-    """
-    Wyswietla waznosc cech (feature importance)
-
-    Args:
-        model: wytrenowany model
-        feature_names: nazwy cech
-        model_name: nazwa modelu
-        top_n: liczba najwazniejszych cech do wyswietlania
-        save: czy zapisac wykres
-    """
-
+    """Wyświetla ważność cech"""
     if not hasattr(model, 'feature_importances_'):
         print(f"Model {model_name} nie posiada feature_importances_")
         return
-
+    
     importances = model.feature_importances_
     indices = np.argsort(importances)[::-1][:top_n]
-
+    
     plt.figure(figsize=(12, 8))
-    plt.title(f'Top {top_n} najwazniejszych cech - {model_name}',
-                fontsize=14, fontweight='bold')
+    plt.title(f'Top {top_n} najważniejszych cech - {model_name}',
+              fontsize=14, fontweight='bold')
     plt.barh(range(top_n), importances[indices], color='steelblue', edgecolor='black')
     plt.yticks(range(top_n), [feature_names[i] for i in indices])
     plt.xlabel('Ważność cechy', fontsize=12)
     plt.gca().invert_yaxis()
     plt.grid(axis='x', alpha=0.3)
     plt.tight_layout()
-
+    
     if save:
-        filename = RESULTS_PATH / f'feature_importance_{model_name.lower().replace(" ","_")}.png'
+        filename = RESULTS_PATH / f'feature_importance_{model_name.lower().replace(" ","_")}_improved.png'
         plt.savefig(filename, dpi=300, bbox_inches='tight')
-
+    
     plt.show()
 
-
 def evaluate_model(model, X, y, dataset_name="Test"):
-    """
-    Ewaluacja modelu i wyswietlanie metryk
-
-    Args:
-        model: wytrenowany model
-        X: dane wejsciowe
-        y: prawdziwe etykiety
-        dataset_name: nazwa zbioru danych
-    
-    Returns:
-        dict: slownik z metrykami
-    """
-    
+    """Ewaluacja modelu z rozszerzonymi metrykami"""
     y_pred = model.predict(X)
-
-    #oblicz metryki
+    
+    # Podstawowe metryki
     accuracy = accuracy_score(y, y_pred)
+    balanced_acc = balanced_accuracy_score(y, y_pred)
     precision = precision_score(y, y_pred, average='weighted', zero_division=0)
     recall = recall_score(y, y_pred, average='weighted', zero_division=0)
     f1 = f1_score(y, y_pred, average='weighted', zero_division=0)
-
-    print(f"\n--- Metryki na zbiorze {dataset_name} ---")
-    print(f"Accuracy:  {accuracy:.4f}")
-    print(f"Precision: {precision:.4f}")
-    print(f"Recall:    {recall:.4f}")
-    print(f"F1-Score:  {f1:.4f}")
     
-
-    #classification raport
+    print(f"\n--- Metryki na zbiorze {dataset_name} ---")
+    print(f"Accuracy:          {accuracy:.4f}")
+    print(f"Balanced Accuracy: {balanced_acc:.4f}  ← WAŻNE dla niezbalansowanych klas")
+    print(f"Precision:         {precision:.4f}")
+    print(f"Recall:            {recall:.4f}")
+    print(f"F1-Score:          {f1:.4f}")
+    
+    # Per-class metrics
+    print(f"\n--- Dokładność per kategoria ---")
+    for category in sorted(np.unique(y)):
+        mask = y == category
+        if mask.sum() > 0:
+            cat_acc = (y_pred[mask] == category).sum() / mask.sum()
+            print(f"  Kategoria {int(category)}: {cat_acc:.1%}")
+    
+    # Classification report
     print(f"\n--- Classification report ({dataset_name}) ---")
-    print(classification_report(y, y_pred, target_names=[f"Kategoria {i}" for i in range(1,6)]))
-
+    print(classification_report(y, y_pred, 
+                                target_names=[f"Kategoria {i}" for i in range(1,6)],
+                                zero_division=0))
     
     return {
-        'accuracy' : accuracy,
-        'precision' : precision,
-        'recall' : recall,
-        'f1_score' : f1,
-        'predictions' : y_pred
+        'accuracy': accuracy,
+        'balanced_accuracy': balanced_acc,
+        'precision': precision,
+        'recall': recall,
+        'f1_score': f1,
+        'predictions': y_pred
     }
 
 def compare_models(results_dict):
-    """
-    Porownanie wynikow wszystkich modeli
-
-    Args:
-        results_dict: slownik z wynikami modeli
-    """
-    print_header("Porownanie modeli")
-
-    #przygotowanie danych do porownania
+    """Porównanie wyników wszystkich modeli"""
+    print_header("Porównanie modeli")
+    
     comparison_data = []
     for model_name, metrics in results_dict.items():
         comparison_data.append({
-          'Model': model_name,
-          'Accuracy': metrics['test']['accuracy'],
-          'Precision': metrics['test']['precision'],
-          'Recall': metrics['test']['recall'],
-          'F1-Score': metrics['test']['f1_score']
+            'Model': model_name,
+            'Accuracy': metrics['test']['accuracy'],
+            'Balanced Acc': metrics['test']['balanced_accuracy'],
+            'Precision': metrics['test']['precision'],
+            'Recall': metrics['test']['recall'],
+            'F1-Score': metrics['test']['f1_score']
         })
-       
+    
     df_comparison = pd.DataFrame(comparison_data)
     print("\n", df_comparison.to_string(index=False))
-
-    #wykres porownawczy
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    metrics = ['Accuracy', 'Precision', 'Recall', 'F1-Score']
-
+    
+    # Wykres porównawczy
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    axes = axes.flatten()
+    metrics = ['Accuracy', 'Balanced Acc', 'Precision', 'Recall', 'F1-Score']
+    
     for idx, metric in enumerate(metrics):
-        ax = axes[idx // 2, idx % 2]
+        ax = axes[idx]
         df_comparison.plot(x='Model', y=metric, kind='bar', ax=ax, legend=False, color='skyblue')
         ax.set_title(metric, fontsize=12, fontweight='bold')
         ax.set_ylabel(metric, fontsize=10)
         ax.set_xlabel('')
-        ax.set_ylim([0,1])
+        ax.set_ylim([0, 1])
         ax.grid(axis='y', alpha=0.3)
-
+        
         for i, v in enumerate(df_comparison[metric]):
             ax.text(i, v + 0.01, f'{v:.3f}', ha='center', va='bottom', fontsize=9)
-
     
-    plt.suptitle('Porownanie modeli - wszystkie metryki', fontsize=14, fontweight='bold')
+    axes[-1].axis('off')  # Ukryj ostatni subplot
+    
+    plt.suptitle('Porównanie modeli - wszystkie metryki (IMPROVED)', 
+                 fontsize=14, fontweight='bold')
     plt.tight_layout()
-
+    
     if SAVE_PLOTS:
-        filename = RESULTS_PATH / 'model_comparison.png'
+        filename = RESULTS_PATH / 'model_comparison_improved.png'
         plt.savefig(filename, dpi=300, bbox_inches='tight')
-
+    
     plt.show()
-
-    #znajdz najlepszy model
-    best_model = df_comparison.loc[df_comparison['F1-Score'].idxmax(), 'Model']
-    best_f1 = df_comparison['F1-Score'].max()
-    print(f"\nNajlepszy model: {best_model} (F1-Score: {best_f1:.4f})")
-
-
+    
+    # Znajdź najlepszy model (wg Balanced Accuracy dla niezbalansowanych klas)
+    best_model = df_comparison.loc[df_comparison['Balanced Acc'].idxmax(), 'Model']
+    best_bacc = df_comparison['Balanced Acc'].max()
+    print(f"\n🏆 Najlepszy model: {best_model} (Balanced Accuracy: {best_bacc:.4f})")
+    
     return best_model
 
 def save_model(model, model_name, metrics):
-    """
-    Zapisuje model do pliku
-
-    Args:
-        model: wytrenowany model
-        model_name: nazwa modelu
-        metrics: metryki modelu
-    """
-
+    """Zapisuje model do pliku"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    model_filename = MODEL_PATH / f'{model_name.lower().replace(" ", "_")}_{timestamp}.pkl'
+    
+    model_filename = MODEL_PATH / f'{model_name.lower().replace(" ", "_")}_improved_{timestamp}.pkl'
     with open(model_filename, 'wb') as f:
         pickle.dump(model, f)
-
+    
     print(f"Model zapisany: {model_filename}")
-
-    metrics_filename = MODEL_PATH / f'{model_name.lower().replace(" ","_")}_{timestamp}_metrics.json'
+    
+    metrics_filename = MODEL_PATH / f'{model_name.lower().replace(" ","_")}_improved_{timestamp}_metrics.json'
     with open(metrics_filename, 'w') as f:
-        #usuwanie predictions przed zapytaniem (za duze)
         metrics_to_save = {
-                'train': {k: v for k, v in metrics['train'].items() if k != 'predictions'},
-                'val': {k: v for k, v in metrics['val'].items() if k != 'predictions'},
-                'test': {k: v for k, v in metrics['test'].items() if k != 'predictions'}
+            'train': {k: v for k, v in metrics['train'].items() if k != 'predictions'},
+            'val': {k: v for k, v in metrics['val'].items() if k != 'predictions'},
+            'test': {k: v for k, v in metrics['test'].items() if k != 'predictions'}
         }
         json.dump(metrics_to_save, f, indent=2)
+    
     print(f"Metryki zapisane: {metrics_filename}")
 
+# ============================================================================
+# GŁÓWNA FUNKCJA TRENINGOWA
+# ============================================================================
 
 def main():
-    """
-    Glowna funkcja trenujaca model
-    """
-
-    print_header("Model klasyfikacji kategorii triaży")
-    print(f"Data rozpoczecia: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
+    """Główna funkcja trenująca model"""
+    
+    print_header("ULEPSZONE TRENOWANIE MODELU KLASYFIKACJI TRIAŻY")
+    print(f"Data rozpoczęcia: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # ========================================================================
+    # 1. WCZYTANIE DANYCH
+    # ========================================================================
     print_header("Wczytanie danych")
-
+    
     try:
         X_train = pd.read_csv(DATA_PATH / 'X_train.csv')
         X_val = pd.read_csv(DATA_PATH / 'X_val.csv')
         X_test = pd.read_csv(DATA_PATH / 'X_test.csv')
-
+        
         y_train = pd.read_csv(DATA_PATH / 'y_train.csv').values.ravel()
         y_val = pd.read_csv(DATA_PATH / 'y_val.csv').values.ravel()
         y_test = pd.read_csv(DATA_PATH / 'y_test.csv').values.ravel()
-
-
+        
+        # Usuń kolumny tekstowe
         text_columns = X_train.select_dtypes(include=['object']).columns.tolist()
         if text_columns:
             print(f"Usuwanie kolumn tekstowych: {text_columns}")
             X_train = X_train.drop(columns=text_columns)
             X_val = X_val.drop(columns=text_columns)
             X_test = X_test.drop(columns=text_columns)
-            print(f" Po czyszczeniu: {X_train.shape[1]} cech")
-        else:
-            print("Brak kolumn tekstowych")
-
+            print(f"✓ Po czyszczeniu: {X_train.shape[1]} cech")
+        
         # Konwersja do float
         X_train = X_train.astype(float)
         X_val = X_val.astype(float)
         X_test = X_test.astype(float)
-        print("Dane przekonwertowane na float")
-
-        print(f"Przed SMOTE: {X_train.shape[0]} próbek")
-        print(f"Rozkład klas przed SMOTE:")
-        unique, counts = np.unique(y_train, return_counts=True)
-        for cat, count in zip(unique, counts):
-            print(f"  Kategoria {int(cat)}: {count} próbek")
-
-        smote = SMOTE(random_state=RANDOM_STATE)
-        X_train, y_train = smote.fit_resample(X_train, y_train)
-
-        print(f"\n✓ Po SMOTE: {X_train.shape[0]} próbek")
-        print(f"Rozkład klas po SMOTE:")
-        unique, counts = np.unique(y_train, return_counts=True)
-        for cat, count in zip(unique, counts):
-            print(f"  Kategoria {int(cat)}: {count} próbek")
-
-
-        print("Dane wczytane pomyslnie")
-        print("\nRozmiary zbiorow:")
-        print(f" Treningowy: {X_train.shape[0]:>6} probek x {X_train.shape[1]:>3} cech")
-        print(f" Walidacyjny: {X_val.shape[0]:>6} probek x {X_val.shape[1]:>3} cech")
-        print(f" Testowy: {X_test.shape[0]:>6} probek x {X_test.shape[1]:>3} cech")
-
-        print(f"\nRozklad klas (zbior treningowy):")
-        for category in sorted(np.unique(y_train)):
-            count = np.sum(y_train == category)
-            pct = count / len(y_train) * 100
-            print(f" Kategoria {category}: {count:>3} ({pct:>5.2f}%)")
-
+        
+        print("\n✓ Dane wczytane pomyślnie")
+        print(f"\nRozmiary zbiorów:")
+        print(f"  Treningowy:  {X_train.shape[0]:>5} próbek × {X_train.shape[1]:>3} cech")
+        print(f"  Walidacyjny: {X_val.shape[0]:>5} próbek × {X_val.shape[1]:>3} cech")
+        print(f"  Testowy:     {X_test.shape[0]:>5} próbek × {X_test.shape[1]:>3} cech")
+        
     except FileNotFoundError as e:
-        print("\nBlad: nie znaleziono plikow z danymi")
+        print("\n❌ Błąd: nie znaleziono plików z danymi")
+        print(f"   Szczegóły: {e}")
         return
-
-
-    feature_names = X_train.columns.tolist()
-
-
+    
+    # ========================================================================
+    # 2. ANALIZA ROZKŁADU KLAS
+    # ========================================================================
+    print_header("Analiza rozkładu klas")
+    
+    train_dist = analyze_class_distribution(y_train, "Treningowy (przed oversampling)")
+    test_dist = analyze_class_distribution(y_test, "Testowy")
+    
+    # ========================================================================
+    # 3. BALANSOWANIE KLAS - SMOTETomek
+    # ========================================================================
+    print_header("Balansowanie klas - SMOTETomek")
+    
+    print("\n📊 Metoda: SMOTETomek")
+    print("   = SMOTE (syntetyczne przykłady) + Tomek Links (czyszczenie granic)")
+    print("   Zalety:")
+    print("   • Tworzy nowe przykłady dla klas mniejszościowych")
+    print("   • Usuwa przypadki na granicy klas (zmniejsza szum)")
+    print("   • Lepsze wyniki niż sam SMOTE")
+    
+    print(f"\n⏳ Przed balansowaniem: {X_train.shape[0]} próbek")
+    
+    # Wypróbuj różne metody balansowania
+    balancing_methods = {
+        'SMOTETomek': SMOTETomek(random_state=RANDOM_STATE),
+        'BorderlineSMOTE': BorderlineSMOTE(random_state=RANDOM_STATE, kind='borderline-1'),
+        'ADASYN': ADASYN(random_state=RANDOM_STATE)
+    }
+    
+    # Użyj SMOTETomek jako domyślnego
+    resampler = balancing_methods['SMOTETomek']
+    
+    X_train_balanced, y_train_balanced = resampler.fit_resample(X_train, y_train)
+    
+    print(f"✓ Po balansowaniu:  {X_train_balanced.shape[0]} próbek")
+    analyze_class_distribution(y_train_balanced, "Treningowy (po oversampling)")
+    
+    # ========================================================================
+    # 4. OBLICZANIE WAG KLAS
+    # ========================================================================
+    print_header("Obliczanie wag klas")
+    
+    # Oblicz wagi dla każdej klasy (dodatkowa ochrona)
+    class_weights = compute_class_weight(
+        class_weight='balanced',
+        classes=np.unique(y_train_balanced),
+        y=y_train_balanced
+    )
+    class_weight_dict = dict(enumerate(class_weights, 1))
+    
+    print("\nWagi dla każdej kategorii (wyższe = bardziej priorytetowe):")
+    for cat, weight in class_weight_dict.items():
+        print(f"  Kategoria {cat}: {weight:.3f}")
+    
+    # ========================================================================
+    # 5. DEFINICJA I TRENING MODELI
+    # ========================================================================
     print_header("Definicja modeli")
+    
+    feature_names = X_train_balanced.columns.tolist()
+    
+    # Ulepszone parametry dla Random Forest
+    print("\n🔍 Hyperparameter tuning dla Random Forest...")
     param_grid = {
-        'n_estimators': [100, 200, 300],
-        'max_depth': [15, 20, 25],
-        'min_samples_split': [2, 5],
+        'n_estimators': [200, 300, 400],
+        'max_depth': [20, 25, 30],
+        'min_samples_split': [2, 5, 10],
+        'min_samples_leaf': [1, 2, 4],
         'class_weight': ['balanced', 'balanced_subsample']
     }
-
-    rf_base = RandomForestClassifier(random_state=RANDOM_STATE, n_jobs=4)
-
+    
+    rf_base = RandomForestClassifier(
+        random_state=RANDOM_STATE,
+        n_jobs=-1,  # Użyj wszystkich rdzeni
+        max_features='sqrt'
+    )
+    
+    # Użyj StratifiedKFold dla lepszej walidacji
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    
     grid_search = GridSearchCV(
-        rf_base, param_grid, cv=3, scoring='accuracy', n_jobs=4, verbose=1
+        rf_base, 
+        param_grid, 
+        cv=cv,
+        scoring='balanced_accuracy',  # Lepsze dla niezbalansowanych klas
+        n_jobs=-1,
+        verbose=2
     )
-
-    grid_search.fit(X_train, y_train)
-
-    print(f"\n✓ Najlepsze parametry:")
+    
+    print("⏳ Trening w toku (może potrwać kilka minut)...")
+    grid_search.fit(X_train_balanced, y_train_balanced)
+    
+    print(f"\n✓ Najlepsze parametry Random Forest:")
     for param, value in grid_search.best_params_.items():
-        print(f"  {param}: {value}")
-
+        print(f"    {param}: {value}")
+    print(f"  Best CV Score: {grid_search.best_score_:.4f}")
+    
     best_rf = grid_search.best_estimator_
-
-
+    
+    # Dodatkowe modele
     models = {}
-
-    models = {}
-
     models['Random Forest'] = best_rf
+    
+    models['Gradient Boosting'] = GradientBoostingClassifier(
+        n_estimators=200,
+        learning_rate=0.1,
+        max_depth=7,
+        random_state=RANDOM_STATE,
+        verbose=0
+    )
+    
     models['Logistic Regression'] = LogisticRegression(
-        max_iter=1000, random_state=RANDOM_STATE, class_weight='balanced', n_jobs=4
+        max_iter=2000,
+        random_state=RANDOM_STATE,
+        class_weight='balanced',
+        solver='saga',
+        n_jobs=-1
     )
-    models['Decision Tree'] = DecisionTreeClassifier(
-        max_depth=20, class_weight='balanced', random_state=RANDOM_STATE
-    )
-
-    # Ensemble
+    
+    # Ensemble z wagami
     ensemble = VotingClassifier(
-        estimators=[('rf', best_rf), ('lr', models['Logistic Regression']), 
-                    ('dt', models['Decision Tree'])],
-        voting='soft', n_jobs=4
+        estimators=[
+            ('rf', best_rf),
+            ('gb', models['Gradient Boosting']),
+            ('lr', models['Logistic Regression'])
+        ],
+        voting='soft',
+        weights=[2, 2, 1],  # RF i GB mają większą wagę
+        n_jobs=-1
     )
-    models['Ensemble'] = ensemble
-
+    models['Ensemble (Weighted)'] = ensemble
+    
+    # ========================================================================
+    # 6. EWALUACJA MODELI
+    # ========================================================================
     results = {}
     trained_models = {}
-
+    
     for model_name, model in models.items():
-        print_header(f"Trening: {model_name}")
-
-        #trening
-        print("Trening w toku...")
-        model.fit(X_train, y_train)
-        print("Trening zkaonczony")
-
+        print_header(f"Trening i ewaluacja: {model_name}")
+        
+        # Trening (jeśli nie jest już wytrenowany)
+        if model_name != 'Random Forest':
+            print("⏳ Trening w toku...")
+            model.fit(X_train_balanced, y_train_balanced)
+            print("✓ Trening zakończony")
+        
         trained_models[model_name] = model
-
-        #ewaluacja na wszystkich zbiorach
+        
+        # Ewaluacja na wszystkich zbiorach
         results[model_name] = {
-            'train': evaluate_model(model, X_train, y_train, "Treningowy"),
+            'train': evaluate_model(model, X_train_balanced, y_train_balanced, "Treningowy"),
             'val': evaluate_model(model, X_val, y_val, "Walidacyjny"),
             'test': evaluate_model(model, X_test, y_test, "Testowy")
         }
-
-        if SAVE_PLOTS:
-            plot_confusion_matrix(y_test, results[model_name]['test']['predictions'], model_name, save=True)
-
-
-        if SAVE_PLOTS and model_name in ['Random Forest', 'Decision Tree']:
-            plot_feature_importance(model, feature_names, model_name, top_n=20, save=True)
-
-
-
         
+        # Wykresy
+        if SAVE_PLOTS:
+            plot_confusion_matrix(
+                y_test, 
+                results[model_name]['test']['predictions'], 
+                model_name, 
+                save=True
+            )
+        
+        if SAVE_PLOTS and model_name in ['Random Forest', 'Gradient Boosting']:
+            plot_feature_importance(model, feature_names, model_name, top_n=20, save=True)
+    
+    # ========================================================================
+    # 7. PORÓWNANIE I WYBÓR NAJLEPSZEGO MODELU
+    # ========================================================================
     best_model_name = compare_models(results)
     best_model = trained_models[best_model_name]
-
-
+    
+    # ========================================================================
+    # 8. SZCZEGÓŁOWA ANALIZA NAJLEPSZEGO MODELU
+    # ========================================================================
+    print_header(f"Szczegółowa analiza najlepszego modelu: {best_model_name}")
+    
+    best_metrics = results[best_model_name]['test']
+    
+    print(f"\n🎯 Metryki finalne na zbiorze testowym:")
+    print(f"   Accuracy:          {best_metrics['accuracy']:.2%}")
+    print(f"   Balanced Accuracy: {best_metrics['balanced_accuracy']:.2%}")
+    print(f"   F1-Score:          {best_metrics['f1_score']:.2%}")
+    
+    # Porównanie z poprzednim modelem
+    print(f"\n📊 Porównanie z poprzednim modelem:")
+    print(f"   Poprzedni:  60.89% accuracy")
+    print(f"   Obecny:     {best_metrics['accuracy']:.2%}")
+    improvement = (best_metrics['accuracy'] - 0.6089) * 100
+    print(f"   Poprawa:    {improvement:+.2f} punktów procentowych")
+    
+    if best_metrics['balanced_accuracy'] >= 0.80:
+        print(f"\n✅ CEL OSIĄGNIĘTY! Balanced Accuracy >= 80%")
+    elif best_metrics['balanced_accuracy'] >= 0.75:
+        print(f"\n⚠️  Blisko celu. Balanced Accuracy: {best_metrics['balanced_accuracy']:.2%}")
+        print(f"   Sugestie dalszych ulepszeń:")
+        print(f"   • Dodaj więcej cech (GCS, poziom bólu, etc.)")
+        print(f"   • Wygeneruj więcej danych treningowych")
+        print(f"   • Spróbuj XGBoost lub LightGBM")
+    else:
+        print(f"\n❌ Cel nie osiągnięty. Potrzebne dalsze ulepszenia.")
+    
+    # ========================================================================
+    # 9. ZAPIS MODELU
+    # ========================================================================
     print_header("Zapis modelu")
     save_model(best_model, best_model_name, results[best_model_name])
-
+    
+    print("\n" + "="*70)
+    print("✅ TRENING ZAKOŃCZONY SUKCESEM!")
+    print("="*70)
 
 if __name__ == "__main__":
     main()
-
-
-

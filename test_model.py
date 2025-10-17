@@ -12,7 +12,7 @@ import numpy as np
 from pathlib import Path
 
 # Ścieżki
-MODEL_PATH = Path('models/ensemble_20251017_113058.pkl')
+MODEL_PATH = Path('models/random_forest_20251017_123356.pkl')
 DATA_PATH = Path('data/processed/')
 
 print("="*70)
