@@ -13,10 +13,10 @@ from imblearn.over_sampling import SMOTE
 
 
 # Modele ML
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
-
+from sklearn.model_selection import GridSearchCV  
 # Metryki
 
 from sklearn.metrics import (
@@ -316,39 +316,47 @@ def main():
 
 
     print_header("Definicja modeli")
+    param_grid = {
+        'n_estimators': [100, 200, 300],
+        'max_depth': [15, 20, 25],
+        'min_samples_split': [2, 5],
+        'class_weight': ['balanced', 'balanced_subsample']
+    }
+
+    rf_base = RandomForestClassifier(random_state=RANDOM_STATE, n_jobs=4)
+
+    grid_search = GridSearchCV(
+        rf_base, param_grid, cv=3, scoring='accuracy', n_jobs=4, verbose=1
+    )
+
+    grid_search.fit(X_train, y_train)
+
+    print(f"\n✓ Najlepsze parametry:")
+    for param, value in grid_search.best_params_.items():
+        print(f"  {param}: {value}")
+
+    best_rf = grid_search.best_estimator_
+
 
     models = {}
 
-    #random forest
-    models['Random Forest'] = RandomForestClassifier(
-        n_estimators=100,
-        max_depth=20,
-        class_weight='balanced',
-        min_samples_split=5,
-        min_samples_leaf=2,
-        random_state=RANDOM_STATE,
-        n_jobs=-1,
-        verbose=0
-    )
-    print("Random Forest zdefiniowany")
+    models = {}
 
-    #logistic regression
+    models['Random Forest'] = best_rf
     models['Logistic Regression'] = LogisticRegression(
-        max_iter=1000,
-        random_state=RANDOM_STATE,
-        n_jobs=-1,
-        multi_class='multinomial'
+        max_iter=1000, random_state=RANDOM_STATE, class_weight='balanced', n_jobs=4
     )
-    print("Logistic Regression zdefiniowany")
-
-    #Decision Tree (baseline)
     models['Decision Tree'] = DecisionTreeClassifier(
-        max_depth=15,
-        min_samples_split=5,
-        random_state=RANDOM_STATE
+        max_depth=20, class_weight='balanced', random_state=RANDOM_STATE
     )
-    print("Decision Tree zdefiniowany")
 
+    # Ensemble
+    ensemble = VotingClassifier(
+        estimators=[('rf', best_rf), ('lr', models['Logistic Regression']), 
+                    ('dt', models['Decision Tree'])],
+        voting='soft', n_jobs=4
+    )
+    models['Ensemble'] = ensemble
 
     results = {}
     trained_models = {}

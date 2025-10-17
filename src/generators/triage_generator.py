@@ -466,7 +466,7 @@ class TriageDataGenerator:
         return random_date.replace(hour=hour, minute=minute, second=second)
 
 
-    def generate_dataset(self, num_cases=1500, balance_categories=True, balance_departments=True):
+    def generate_dataset(self, num_cases=7500, balance_categories=True, balance_departments=True):
         """
         Generuje pelny zestaw danych triazu
         args:
@@ -551,7 +551,7 @@ if __name__ == '__main__':
     from ..config.constants import MEDICAL_CASE_TEMPLATES, DEPARTMENTS, DEPARTMENT_CAPACITY
 
     generator = TriageDataGenerator(MEDICAL_CASE_TEMPLATES)
-    df = generator.generate_dataset(num_cases=1500, balance_categories=True)
+    df = generator.generate_dataset(num_cases=7500, balance_categories=True)
 
     output_file = "data/raw/triage_data.csv"
     df.to_csv(output_file, index=False)
