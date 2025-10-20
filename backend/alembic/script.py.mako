@@ -1,0 +1,1 @@
+# Alembic template - będzie skonfigurowane później

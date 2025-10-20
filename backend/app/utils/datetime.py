@@ -1,0 +1,1 @@
+# Funkcje pomocnicze do dat - TODO

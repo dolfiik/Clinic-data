@@ -1,0 +1,1 @@
+# Alembic environment - będzie skonfigurowane później

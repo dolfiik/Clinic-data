@@ -1,0 +1,1 @@
+# Business logic dla pacjentów - TODO

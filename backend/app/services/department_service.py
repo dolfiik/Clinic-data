@@ -1,0 +1,1 @@
+# Business logic dla oddziałów - TODO
