@@ -1,6 +1,8 @@
 from typing import Optional
 from datetime import datetime
 from decimal import Decimal
+from pydantic import BaseModel
+from pydantic import Field
 
 class PatientBase(BaseModel):
     """Bazowe pola pacjenta"""

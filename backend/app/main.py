@@ -2,47 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1 import auth, patients, triage, departments, users, audit
+from sqlalchemy import text
+from app.middleware import setup_exception_handlers, setup_logging_middleware
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="""
     System wspierający proces triaży szpitalnej z integracją Machine Learning.
-    
-    ### Główne funkcje:
-    
-    * **Autentykacja** - Rejestracja, logowanie, zarządzanie tokenami JWT
-    * **Pacjenci** - Pełny CRUD, wyszukiwanie, statusy
-    * **Triąż** - Predykcje ML (Random Forest), statystyki, analityka
-    * **Oddziały** - Monitorowanie obłożenia, historia, prognozy
-    * **Użytkownicy** - Zarządzanie kontami, role, uprawnienia
-    * **Audit Log** - Pełna historia akcji, filtry, timeline
-    
-    ### Autoryzacja:
-    
-    Większość endpointów wymaga Bearer Token w nagłówku Authorization:
-    ```
-    Authorization: Bearer <your_access_token>
-    ```
-    
-    Token otrzymujesz po zalogowaniu przez `POST /api/v1/auth/login`
-    
-    ### Role użytkowników:
-    
-    * **admin** - Pełny dostęp do wszystkich funkcji
-    * **doctor** - Dostęp do pacjentów, triaży, statystyk
-    * **nurse** - Dostęp do pacjentów, triaży, obłożenia
-    * **receptionist** - Ograniczony dostęp (przeglądanie)
-    
-    ### Model ML:
-    
-    System używa Random Forest Classifier do predykcji kategorii triaży (1-5):
-    * **Kategoria 1** - Natychmiastowy (resuscytacja)
-    * **Kategoria 2** - Pilny (ciężki stan)
-    * **Kategoria 3** - Stabilny
-    * **Kategoria 4** - Niski priorytet
-    * **Kategoria 5** - Bardzo niski
-    
-    Model trenowany na 20 000 przypadków medycznych z accuracy ~95%.
     """,
     version="1.0.0",
     openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
@@ -64,6 +30,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+setup_logging_middleware(app)
+setup_exception_handlers(app)
 
 # Include Routers
 app.include_router(
@@ -165,7 +134,7 @@ async def health_check():
     from app.core.database import engine
     try:
         with engine.connect() as connection:
-            connection.execute("SELECT 1")
+            connection.execute(text("SELECT 1"))
         database_status = "healthy"
     except Exception as e:
         database_status = "down"
@@ -231,7 +200,7 @@ async def startup_event():
     from app.core.database import engine
     try:
         with engine.connect() as connection:
-            connection.execute("SELECT 1")
+            connection.execute(text("SELECT 1"))
         print("Database connection: OK")
     except Exception as e:
         print(f"Database connection: FAILED - {e}")
