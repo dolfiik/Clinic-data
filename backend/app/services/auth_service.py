@@ -106,8 +106,8 @@ class AuthService:
         user.last_login = datetime.utcnow()
         db.commit()
         
-        access_token = create_access_token(data={"sub": user.id, "role": user.role})
-        refresh_token = create_refresh_token(data={"sub": user.id})
+        access_token = create_access_token(data={"sub": str(user.id), "role": user.role})
+        refresh_token = create_refresh_token(data={"sub": str(user.id)})
         
         log_action(
             db=db,

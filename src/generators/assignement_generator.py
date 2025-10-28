@@ -192,7 +192,7 @@ def generate_arrangement_data(num_records=5000):
     print(f"  Zakres czasowy: {arrangement_data['timestamp'].min()} → {arrangement_data['timestamp'].max()}")
     
     # Statystyki obłożenia
-    print(f"\n📊 Statystyki obłożenia oddziałów:")
+    print(f"\nStatystyki obłożenia oddziałów:")
     first_occupancy = json.loads(arrangement_data['obłożenie_oddziałów'].iloc[0])
     for dept in first_occupancy.keys():
         occupancies = [json.loads(row)[dept] for row in arrangement_data['obłożenie_oddziałów']]
@@ -218,9 +218,9 @@ if __name__ == "__main__":
             print(f"\n✓ Dane zapisane: {output_path}")
             print(f"  Rozmiar pliku: {len(arrangement_data)} wierszy")
         except Exception as e:
-            print(f"\n❌ Error saving data: {e}")
+            print(f"\n Error saving data: {e}")
     else:
-        print("\n❌ Failed to generate arrangement data")
+        print("\n Failed to generate arrangement data")
     
     print("\n" + "="*70)
     print("GOTOWE! Możesz teraz trenować model LSTM.")

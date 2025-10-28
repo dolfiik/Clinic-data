@@ -11,26 +11,20 @@ const LoginForm = ({ onLoginSuccess }) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
+    
     try {
       const data = await login(email, password);
-      console.log('LOGIN SUCCESS:', data);
-      console.log('Token received:', data.access_token);
-      setAuthToken(data.access_token);
-      console.log('Token saved:', localStorage.getItem('token'));
-      localStorage.setItem('user', JSON.stringify({ email }));
       
+      setAuthToken(data.access_token);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      localStorage.setItem('user', JSON.stringify({ email }));
       onLoginSuccess(data);
     } catch (err) {
-      setError(
-        err.response?.data?.detail || 
-        'Błąd logowania. Sprawdź dane i spróbuj ponownie.'
-      );
+      setError(err.response?.data?.detail || 'Błąd logowania');
     } finally {
       setLoading(false);
     }
   };
-
   return (
     <div className="login-container">
       <div className="login-box">

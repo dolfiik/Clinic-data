@@ -11,12 +11,12 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
+  
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-  }
+  } 
   return config;
 });
-
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -24,7 +24,7 @@ api.interceptors.response.use(
       // Token wygasł lub nieprawidłowy - wyloguj
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.reload();
+      //window.location.reload();
     }
     return Promise.reject(error);
   }
@@ -35,23 +35,18 @@ api.interceptors.response.use(
 // ============================================================================
 
 export const login = async (email, password) => {
-  const formData = new URLSearchParams();
-  formData.append('username', email);
-  formData.append('password', password);
-  
-  const response = await api.post('/auth/login', formData, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: JSON.stringify({
-      username: email,
-      password: password
-    })
+  const response = await api.post('/auth/login', {
+    email: email,      
+    password: password
   });
-  
-  console.log('API RESPONSE:', response.data);
+  localStorage.setItem('token', response.data.access_token);
+  localStorage.setItem('refresh_token', response.data.refresh_token);
+
+  api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
+
   return response.data;
 };
+
 export const logout = async () => {
   try {
     await api.post('/auth/logout');
@@ -59,6 +54,7 @@ export const logout = async () => {
     console.error('Logout error:', error);
   } finally {
     localStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
   }
 };

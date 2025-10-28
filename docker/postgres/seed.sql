@@ -1,9 +1,8 @@
 INSERT INTO users (email, username, password_hash, role, is_active) VALUES
-    ('admin@clinic.local', 'admin', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5uDzv7rVGvQqm', 'admin', true),
-    ('dr.kowalski@clinic.local', 'dr_kowalski', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5uDzv7rVGvQqm', 'doctor', true),
-    ('nurse.anna@clinic.local', 'nurse_anna', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5uDzv7rVGvQqm', 'nurse', true),
-    ('reception@clinic.local', 'reception', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5uDzv7rVGvQqm', 'receptionist', true);
-
+    ('admin@clinic.local', 'admin', '$2b$12$3OWOF8bIlDXICfj6JQMs1.avQwawC.sTXOScrpl2dYU9oT5WWfZ6C', 'admin', true),
+    ('dr.kowalski@clinic.local', 'dr_kowalski', '$2b$12$3OWOF8bIlDXICfj6JQMs1.avQwawC.sTXOScrpl2dYU9oT5WWfZ6C', 'doctor', true),
+    ('nurse.anna@clinic.local', 'nurse_anna', '$2b$12$3OWOF8bIlDXICfj6JQMs1.avQwawC.sTXOScrpl2dYU9oT5WWfZ6C', 'nurse', true),
+    ('reception@clinic.local', 'reception', '$2b$12$3OWOF8bIlDXICfj6JQMs1.avQwawC.sTXOScrpl2dYU9oT5WWfZ6C', 'receptionist', true);
 -- password123
 
 INSERT INTO patients (

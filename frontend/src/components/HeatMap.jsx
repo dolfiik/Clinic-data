@@ -1,24 +1,39 @@
 import { useState, useEffect } from 'react';
 import { getDepartmentOccupancy } from '../services/api';
 
-const HeatMap = () => {
+const HeatMap = ({ isLoggedIn }) => {
   const [occupancy, setOccupancy] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchOccupancy();
+    
+    if (!isLoggedIn) {
+      setLoading(false);
+      return;
+    }
+
+    // Małe opóźnienie dla pewności że token jest zapisany
+    const timer = setTimeout(() => {
+      fetchOccupancy();
+    }, 150);
+
     const interval = setInterval(fetchOccupancy, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, [isLoggedIn]);
 
   const fetchOccupancy = async () => {
+    const token = localStorage.getItem('token');
+    
     try {
       const data = await getDepartmentOccupancy();
       setOccupancy(data);
       setError('');
     } catch (err) {
-      console.error('Error fetching occupancy:', err);
       setError('Błąd pobierania danych');
     } finally {
       setLoading(false);
@@ -41,75 +56,38 @@ const HeatMap = () => {
 
   if (loading) {
     return (
-      <div className="heatmap">
-        <h2>Obłożenie Oddziałów</h2>
-        <div className="loading">Ładowanie...</div>
+      <div className="heatmap-container">
+        <div className="loading">Ładowanie danych...</div>
       </div>
     );
   }
 
-  if (error || !occupancy) {
+  if (error) {
     return (
-      <div className="heatmap">
-        <h2>Obłożenie Oddziałów</h2>
-        <div className="error-message">{error || 'Brak danych'}</div>
+      <div className="heatmap-container">
+        <div className="error">{error}</div>
+      </div>
+    );
+  }
+
+  if (!occupancy) {
+    return (
+      <div className="heatmap-container">
+        <div className="no-data">Brak danych</div>
       </div>
     );
   }
 
   return (
-    <div className="heatmap">
-      <h2>Obłożenie Oddziałów</h2>
-      <div className="heatmap-timestamp">
-        Aktualizacja: {new Date(occupancy.timestamp).toLocaleString('pl-PL', {
-          hour: '2-digit',
-          minute: '2-digit'
-        })}
+    <div className="heatmap-container">
+      <div className="heatmap-header">
+        <h2>Obłożenie Oddziałów</h2>
+        <span className="last-update">
+          Ostatnia aktualizacja: {new Date(occupancy.timestamp).toLocaleString('pl-PL')}
+        </span>
       </div>
 
-      <div className="departments-list">
-        {occupancy.departments.map((dept) => {
-          const percentage = dept.percentage;
-          const barColor = getOccupancyColor(percentage);
-          const status = getStatusLabel(percentage);
-
-          return (
-            <div key={dept.name} className="department-item">
-              <div className="department-header">
-                <span className="department-name">{dept.name}</span>
-                <span className="department-count">
-                  {dept.current}/{dept.capacity}
-                </span>
-              </div>
-              
-              <div className="occupancy-bar-container">
-                <div 
-                  className="occupancy-bar"
-                  style={{ 
-                    width: `${percentage}%`,
-                    backgroundColor: barColor
-                  }}
-                />
-              </div>
-              
-              <div className="department-footer">
-                <span className="occupancy-percentage">
-                  {percentage.toFixed(0)}%
-                </span>
-                <span 
-                  className="occupancy-status"
-                  style={{ color: barColor }}
-                >
-                  {status}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Podsumowanie */}
-      <div className="occupancy-summary">
+      <div className="heatmap-summary">
         <div className="summary-item">
           <span className="summary-label">Całkowite obłożenie:</span>
           <span className="summary-value">
@@ -117,38 +95,59 @@ const HeatMap = () => {
           </span>
         </div>
         <div className="summary-item">
-          <span className="summary-label">Procent:</span>
+          <span className="summary-label">Procent obłożenia:</span>
           <span className="summary-value">
             {occupancy.overall_percentage.toFixed(1)}%
           </span>
         </div>
-        <div className="summary-item">
-          <span className="summary-label">Dostępne łóżka:</span>
-          <span className="summary-value">
-            {occupancy.total_capacity - occupancy.total_occupancy}
-          </span>
-        </div>
       </div>
 
-      {/* Legenda */}
-      <div className="occupancy-legend">
-        <h4>Legenda</h4>
+      <div className="heatmap-grid">
+        {Object.values(occupancy.departments).map((dept) => (
+          <div 
+            key={dept.name}
+            className="department-card"
+            style={{ backgroundColor: getOccupancyColor(dept.occupancy_percentage) }}
+          >
+            <h3>{dept.name}</h3>
+            <div className="occupancy-info">
+              <div className="occupancy-numbers">
+                <span className="occupancy-current">{dept.current_occupancy}</span>
+                <span className="occupancy-separator">/</span>
+                <span className="occupancy-capacity">{dept.capacity}</span>
+              </div>
+              <div className="occupancy-percentage">
+                {dept.occupancy_percentage.toFixed(1)}%
+              </div>
+              <div className={`status-badge status-${dept.status.toLowerCase()}`}>
+                {getStatusLabel(dept.occupancy_percentage)}
+              </div>
+              <div className="available-beds">
+                Dostępne łóżka: {dept.available_beds}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="heatmap-legend">
+        <h4>Legenda:</h4>
         <div className="legend-items">
           <div className="legend-item">
-            <div className="legend-color" style={{ backgroundColor: '#d4f5b3' }} />
-            <span>&lt;40% NISKIE</span>
+            <div className="legend-color" style={{ backgroundColor: '#d4f5b3' }}></div>
+            <span>Niskie (&lt;40%)</span>
           </div>
           <div className="legend-item">
-            <div className="legend-color" style={{ backgroundColor: '#a7eb67' }} />
-            <span>40-60% ŚREDNIE</span>
+            <div className="legend-color" style={{ backgroundColor: '#a7eb67' }}></div>
+            <span>Średnie (40-60%)</span>
           </div>
           <div className="legend-item">
-            <div className="legend-color" style={{ backgroundColor: '#6b9c3d' }} />
-            <span>60-80% WYSOKIE</span>
+            <div className="legend-color" style={{ backgroundColor: '#6b9c3d' }}></div>
+            <span>Wysokie (60-80%)</span>
           </div>
           <div className="legend-item">
-            <div className="legend-color" style={{ backgroundColor: '#2d5016' }} />
-            <span>&gt;80% KRYTYCZNE</span>
+            <div className="legend-color" style={{ backgroundColor: '#2d5016' }}></div>
+            <span>Krytyczne (≥80%)</span>
           </div>
         </div>
       </div>

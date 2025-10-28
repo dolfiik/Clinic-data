@@ -25,6 +25,7 @@ def get_current_user(
     Raises:
         HTTPException: 401 jeśli token jest nieprawidłowy lub użytkownik nie istnieje
     """
+    print(f"🔍 BACKEND - Otrzymany token: {token[:50]}..." if token else "🔍 BACKEND - BRAK TOKENA")
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -35,7 +36,7 @@ def get_current_user(
     if payload is None:
         raise credentials_exception
     
-    user_id: int = payload.get("sub")
+    user_id: int = int(payload.get("sub"))
     if user_id is None:
         raise credentials_exception
     

@@ -172,7 +172,7 @@ class TriagePredictor:
     
     def reload_model(self):
         """Przeładowuje model (np. po aktualizacji)"""
-        print("🔄 Przeładowywanie modelu...")
+        print("Przeładowywanie modelu...")
         self._load_model()
 
 predictor = TriagePredictor()

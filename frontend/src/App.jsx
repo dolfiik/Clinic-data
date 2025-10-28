@@ -22,11 +22,13 @@ function App() {
   }, []);
 
   const handleLoginSuccess = (data) => {
-    setIsLoggedIn(true);
-    const userEmail = JSON.parse(localStorage.getItem('user')).email;
+    const userEmail = JSON.parse(localStorage.getItem('user'))?.email;
     setUser({ email: userEmail });
+    
+    setTimeout(() => {
+      setIsLoggedIn(true);
+    }, 100);
   };
-
   const handleLogout = async () => {
     await logout();
     setIsLoggedIn(false);
@@ -75,7 +77,7 @@ function App() {
 
         {/* Prawa strona - HeatMap */}
         <div className="right-panel">
-          <HeatMap />
+            {isLoggedIn && user && <HeatMap isLoggedIn={isLoggedIn} />}
         </div>
       </div>
     </div>

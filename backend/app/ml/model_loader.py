@@ -34,7 +34,7 @@ class ModelLoader:
         
         latest_model = max(rf_models, key=lambda p: p.stat().st_mtime)
         
-        print(f"📦 Ładowanie modelu: {latest_model.name}")
+        print(f"Ładowanie modelu: {latest_model.name}")
         
         with open(latest_model, 'rb') as f:
             self.model = pickle.load(f)
