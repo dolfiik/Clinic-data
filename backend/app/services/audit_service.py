@@ -1,9 +1,19 @@
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any, List
 from datetime import datetime
-
+from decimal import Decimal
 from app.models import AuditLog, User
 from app.schemas import AuditLogCreate, AuditLogResponse, AuditLogWithUser, AuditLogFilter
+
+def convert_decimals(obj: Any) -> Any:
+    """Konwertuje Decimal na float dla JSON serializacji"""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {k: convert_decimals(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_decimals(item) for item in obj]
+    return obj
 
 def log_action(
     db: Session,
@@ -33,6 +43,10 @@ def log_action(
     Returns:
         Utworzony log
     """
+    if old_values:
+       old_values = convert_decimals(old_values)
+    if new_values:
+        new_values = convert_decimals(new_values)
     log = AuditLog(
         user_id=user_id,
         action=action,

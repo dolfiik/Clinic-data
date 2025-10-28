@@ -27,29 +27,20 @@ class TriagePredictor:
             self.model = None
     
     def predict(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Wykonuje predykcję kategorii triaży
-        
-        Args:
-            patient_data: Dane pacjenta (surowe)
-            
-        Returns:
-            Dict z kategorią i prawdopodobieństwami:
-            {
-                "category": int,
-                "probabilities": {"1": float, "2": float, ...},
-                "confidence": float,
-                "model_version": str
-            }
-            
-        Raises:
-            HTTPException: Jeśli model nie jest załadowany lub dane są nieprawidłowe
-        """
+        """Wykonuje predykcję kategorii triaży"""
         if self.model is None:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="ML model not loaded. Check server logs for details."
             )
+        
+        # ✅ LOG 1 - RAW INPUT
+        print("=" * 70)
+        print("🔍 DEBUGGING PREDICTION")
+        print("=" * 70)
+        print("📥 RAW INPUT:")
+        for key, value in patient_data.items():
+            print(f"  {key}: {value}")
         
         is_valid, error_message = preprocessor.validate_input(patient_data)
         if not is_valid:
@@ -60,6 +51,18 @@ class TriagePredictor:
         
         try:
             X = preprocessor.transform(patient_data)
+            
+            print("\n📊 PREPROCESSED DATA:")
+            print(f"  Shape: {X.shape}")
+            print("\n  WSZYSTKIE cechy:")
+            for col in X.columns:
+                value = X[col].values[0]
+                # Pokaż tylko niezerowe dla szablonów i oddziałów
+                if col.startswith('szablon_') or col.startswith('oddział_'):
+                    if value > 0:
+                        print(f"    ✅ {col}: {value:.4f}")
+                else:
+                    print(f"    {col}: {value:.4f}")            
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -70,6 +73,15 @@ class TriagePredictor:
             category = self.model.predict(X)[0]
             probabilities = self.model.predict_proba(X)[0]
             confidence = float(max(probabilities))
+            
+            # ✅ LOG 3 - PREDICTION RESULT
+            print("\n🎲 PREDICTION RESULT:")
+            print(f"  Predicted category: {int(category)}")
+            print(f"  Confidence: {confidence:.2%}")
+            print(f"  All probabilities:")
+            for i, prob in enumerate(probabilities, 1):
+                print(f"    Category {i}: {prob:.2%}")
+            print("=" * 70)
             
             result = {
                 "category": int(category),
@@ -90,8 +102,8 @@ class TriagePredictor:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Model prediction failed: {str(e)}"
-            )
-    
+            )            
+            
     def predict_batch(self, patients_data: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
         """
         Wykonuje predykcję dla wielu pacjentów

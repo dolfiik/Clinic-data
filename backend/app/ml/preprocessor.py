@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import pickle
 from typing import Dict, Any, Optional
+from datetime import datetime
 
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -16,32 +17,36 @@ class TriagePreprocessor:
     """
     
     def __init__(self, scaler_path: Optional[str] = None):
-        """
-        Inicjalizacja preprocessora
-        
-        Args:
-            scaler_path: Ścieżka do zapisanego scalera (opcjonalne)
-        """
+        """Inicjalizacja preprocessora"""
         self.scaler = None
         self.scaler_path = scaler_path or str(Path(settings.MODEL_PATH) / 'scaler.pkl')
         
         self.numerical_features = [
-            'wiek', 'tetno', 'cisnienie_skurczowe', 'cisnienie_rozkurczowe',
-            'temperatura', 'saturacja', 'gcs', 'bol', 'czestotliwosc_oddechow',
-            'czas_od_objawow_h'
+            'wiek', 'tętno', 'ciśnienie_skurczowe', 'ciśnienie_rozkurczowe',
+            'temperatura', 'saturacja'
         ]
         
         self.templates = [
-            'zawał_STEMI', 'udar_ciężki', 'uraz_wielonarządowy',
-            'zapalenie_płuc_ciężkie', 'zapalenie_wyrostka', 'silne_krwawienie',
-            'złamanie_proste', 'infekcja_moczu', 'zaostrzenie_astmy',
-            'ból_brzucha_łagodny', 'skręcenie_lekkie', 'migrena',
-            'przeziębienie', 'kontrola', 'receptura'
+            'ból_brzucha_łagodny',      
+            'infekcja_moczu',           
+            'kontrola',
+            'migrena',
+            'przeziębienie',
+            'receptura',
+            'silne_krwawienie',
+            'skręcenie_lekkie',
+            'udar_ciężki',              
+            'uraz_wielonarządowy',
+            'zaostrzenie_astmy',
+            'zapalenie_płuc_ciężkie',   
+            'zapalenie_wyrostka',
+            'zawał_STEMI',              
+            'złamanie_proste'           
         ]
         
         self.departments = [
-            'SOR', 'Interna', 'Kardiologia', 'Chirurgia',
-            'Ortopedia', 'Neurologia', 'Pediatria', 'Ginekologia'
+            'Chirurgia', 'Interna', 'Kardiologia', 
+            'Neurologia', 'Ortopedia', 'SOR'
         ]
         
         self._load_scaler()
@@ -56,11 +61,12 @@ class TriagePreprocessor:
                 print(f"✓ Scaler załadowany z: {scaler_path}")
             else:
                 print(f"⚠ Scaler nie znaleziony: {scaler_path}")
-                print("  Model będzie działał bez skalowania (może obniżyć dokładność)")
+                print("  Model będzie działał bez skalowania")
+                self.scaler = None  
         except Exception as e:
             print(f"⚠ Błąd ładowania scalera: {e}")
-            self.scaler = None
-    
+            self.scaler = None   
+
     def _fill_missing_values(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Wypełnia brakujące wartości domyślnymi
@@ -72,15 +78,11 @@ class TriagePreprocessor:
             Dane z wypełnionymi wartościami
         """
         defaults = {
-            'tetno': 75.0,
-            'cisnienie_skurczowe': 120.0,
-            'cisnienie_rozkurczowe': 80.0,
+            'tętno': 75.0,
+            'ciśnienie_skurczowe': 120.0,
+            'ciśnienie_rozkurczowe': 80.0,
             'temperatura': 36.6,
-            'saturacja': 98.0,
-            'gcs': 15,
-            'bol': 5,
-            'czestotliwosc_oddechow': 16.0,
-            'czas_od_objawow_h': 24.0
+            'saturacja': 98.0
         }
         
         filled_data = data.copy()
@@ -90,6 +92,44 @@ class TriagePreprocessor:
                 filled_data[feature] = default_value
         
         return filled_data
+    
+    def _normalize_template_name(self, template: Optional[str]) -> Optional[str]:
+        """
+        Normalizuje nazwę szablonu do formatu oczekiwanego przez model
+        
+        Args:
+            template: Oryginalna nazwa szablonu
+            
+        Returns:
+            Znormalizowana nazwa lub None
+        """
+        if not template:
+            return None
+        
+        template_mapping = {
+            'Ból brzucha': 'ból_brzucha_łagodny',
+            'Ból w klatce piersiowej': 'zawał_STEMI',
+            'bol_w_klatce': 'zawał_STEMI',
+            'bol_brzucha': 'ból_brzucha_łagodny',
+            'infekcja_ukladu_moczowego': 'infekcja_moczu',
+            'udar': 'udar_ciężki',
+            'zapalenie_pluc': 'zapalenie_płuc_ciężkie',
+            'zlamanie_konczyny': 'złamanie_proste',
+            'migrena': 'migrena',
+            'silne_krwawienie': 'silne_krwawienie',
+            'zaostrzenie_astmy': 'zaostrzenie_astmy',
+            'zapalenie_wyrostka': 'zapalenie_wyrostka',
+            'uraz_wielonarzadowy': 'uraz_wielonarządowy'
+        }        
+        if template in template_mapping:
+            return template_mapping[template]
+        
+        normalized = template.lower().replace(' ', '_').replace('ł', 'l').replace('ą', 'a').replace('ę', 'e').replace('ć', 'c').replace('ń', 'n').replace('ó', 'o').replace('ś', 's').replace('ź', 'z').replace('ż', 'z')
+        
+        if normalized in self.templates:
+            return normalized
+        
+        return None
     
     def _create_numerical_dataframe(self, data: Dict[str, Any]) -> pd.DataFrame:
         """
@@ -101,12 +141,26 @@ class TriagePreprocessor:
         Returns:
             DataFrame z cechami numerycznymi
         """
-        data = self._fill_missing_values(data)
+        field_mapping = {
+        'tetno': 'tętno',
+        'cisnienie_skurczowe': 'ciśnienie_skurczowe',
+        'cisnienie_rozkurczowe': 'ciśnienie_rozkurczowe',
+        'bol': 'ból',
+        'czestotliwosc_oddechow': 'częstotliwość_oddechów',
+        'czas_od_objawow_h': 'czas_od_objawów_h'
+        }
+        
+        normalized_data = {}
+        for key, value in data.items():
+            new_key = field_mapping.get(key, key)
+            normalized_data[new_key] = value
+        
+        normalized_data = self._fill_missing_values(normalized_data)
         numerical_data = {}
         
         for feature in self.numerical_features:
-            if feature in data:
-                value = data[feature]
+            if feature in normalized_data:
+                value = normalized_data[feature]
                 if value is not None:
                     numerical_data[feature] = float(value)
                 else:
@@ -116,8 +170,7 @@ class TriagePreprocessor:
         
         df = pd.DataFrame([numerical_data])
         
-        return df
-    
+        return df    
     def _one_hot_encode_template(self, template: Optional[str]) -> pd.DataFrame:
         """
         One-hot encoding dla szablonu przypadku
@@ -128,67 +181,64 @@ class TriagePreprocessor:
         Returns:
             DataFrame z kolumnami one-hot encoded
         """
+        normalized_template = self._normalize_template_name(template)
+        
         encoded = {}
         
         for t in self.templates:
             col_name = f'szablon_{t}'
-            encoded[col_name] = 1 if template == t else 0
+            encoded[col_name] = 1 if normalized_template == t else 0
         
         return pd.DataFrame([encoded])
     
     def _one_hot_encode_gender(self, gender: str) -> pd.DataFrame:
         """
-        One-hot encoding dla płci
+        One-hot encoding dla płci - JEDNA kolumna jak w modelu
         
         Args:
             gender: Płeć (M lub K)
             
         Returns:
-            DataFrame z kolumnami one-hot encoded
+            DataFrame z jedną kolumną płeć_encoded
         """
         encoded = {
-            'plec_M': 1 if gender == 'M' else 0,
-            'plec_K': 1 if gender == 'K' else 0
+            'płeć_encoded': 1 if gender == 'M' else 0
         }
         
         return pd.DataFrame([encoded])
     
-    def _feature_engineering(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _add_datetime_features(self) -> pd.DataFrame:
         """
-        Tworzy dodatkowe cechy (feature engineering)
+        Dodaje cechy związane z czasem (godzina, dzień tygodnia, etc.)
         
-        Args:
-            df: DataFrame z podstawowymi cechami
-            
         Returns:
-            DataFrame z dodatkowymi cechami
+            DataFrame z cechami czasowymi
         """
-        df_eng = df.copy()
+        now = datetime.now()
         
-        if 'cisnienie_skurczowe' in df.columns and 'cisnienie_rozkurczowe' in df.columns:
-            df_eng['cisnienie_pulsowe'] = df['cisnienie_skurczowe'] - df['cisnienie_rozkurczowe']
+        datetime_features = {
+            'godzina': now.hour,
+            'dzien_tygodnia': now.weekday(),
+            'miesiac': now.month,
+            'czy_weekend': 1 if now.weekday() >= 5 else 0
+        }
         
-        if 'cisnienie_skurczowe' in df.columns and 'cisnienie_rozkurczowe' in df.columns:
-            df_eng['srednie_cisnienie'] = (df['cisnienie_skurczowe'] + 2 * df['cisnienie_rozkurczowe']) / 3
+        return pd.DataFrame([datetime_features])
+    
+    def _one_hot_encode_departments(self) -> pd.DataFrame:
+        """
+        One-hot encoding dla oddziałów - wszystkie na 0 (nie znamy jeszcze oddziału docelowego)
         
-        if 'tetno' in df.columns and 'cisnienie_skurczowe' in df.columns:
-            with np.errstate(divide='ignore', invalid='ignore'):
-                shock_idx = df['tetno'] / df['cisnienie_skurczowe']
-                df_eng['shock_index'] = np.where(np.isfinite(shock_idx), shock_idx, 0)
+        Returns:
+            DataFrame z kolumnami one-hot encoded dla oddziałów
+        """
+        encoded = {}
         
-        if 'wiek' in df.columns:
-            df_eng['wiek_dziecko'] = (df['wiek'] < 18).astype(float)
-            df_eng['wiek_senior'] = (df['wiek'] > 65).astype(float)
+        for dept in self.departments:
+            col_name = f'oddział_{dept}'
+            encoded[col_name] = 0
         
-        if 'temperatura' in df.columns:
-            df_eng['goraczka'] = (df['temperatura'] > 38.0).astype(float)
-            df_eng['goraczka_wysoka'] = (df['temperatura'] > 39.0).astype(float)
-        
-        if 'saturacja' in df.columns:
-            df_eng['hipoksja'] = (df['saturacja'] < 90).astype(float)
-            df_eng['hipoksja_ciezka'] = (df['saturacja'] < 85).astype(float)
-        
-        return df_eng
+        return pd.DataFrame([encoded])
     
     def transform(self, patient_data: Dict[str, Any]) -> pd.DataFrame:
         """
@@ -202,15 +252,24 @@ class TriagePreprocessor:
         """
         df_numerical = self._create_numerical_dataframe(patient_data)
         
-        df_engineered = self._feature_engineering(df_numerical)
-        
         gender = patient_data.get('plec', 'M')
         df_gender = self._one_hot_encode_gender(gender)
+        
+        df_datetime = self._add_datetime_features()
+        
+        df_departments = self._one_hot_encode_departments()
         
         template = patient_data.get('szablon_przypadku', None)
         df_template = self._one_hot_encode_template(template)
         
-        df_final = pd.concat([df_engineered, df_gender, df_template], axis=1)
+        # ✅ Kolejność MUSI być zgodna z modelem!
+        df_final = pd.concat([
+            df_numerical,      # wiek, tętno, ciśnienie_skurczowe, ciśnienie_rozkurczowe, temperatura, saturacja
+            df_gender,         # płeć_encoded
+            df_datetime,       # godzina, dzien_tygodnia, miesiac, czy_weekend
+            df_departments,    # oddział_*
+            df_template        # szablon_*
+        ], axis=1)
         
         if self.scaler is not None:
             try:
@@ -233,17 +292,19 @@ class TriagePreprocessor:
         """
         features = []
         
+        # Numerical
         features.extend(self.numerical_features)
         
-        features.extend([
-            'cisnienie_pulsowe', 'srednie_cisnienie', 'shock_index',
-            'wiek_dziecko', 'wiek_senior',
-            'goraczka', 'goraczka_wysoka',
-            'hipoksja', 'hipoksja_ciezka'
-        ])
+        # Gender
+        features.append('płeć_encoded')
         
-        features.extend(['plec_M', 'plec_K'])
+        # Datetime
+        features.extend(['godzina', 'dzien_tygodnia', 'miesiac', 'czy_weekend'])
         
+        # Departments
+        features.extend([f'oddział_{d}' for d in self.departments])
+        
+        # Templates
         features.extend([f'szablon_{t}' for t in self.templates])
         
         return features
@@ -275,10 +336,7 @@ class TriagePreprocessor:
             'cisnienie_skurczowe': (0, 300),
             'cisnienie_rozkurczowe': (0, 200),
             'temperatura': (30, 45),
-            'saturacja': (0, 100),
-            'gcs': (3, 15),
-            'bol': (0, 10),
-            'czestotliwosc_oddechow': (0, 100)
+            'saturacja': (0, 100)
         }
         
         for field, (min_val, max_val) in ranges.items():
