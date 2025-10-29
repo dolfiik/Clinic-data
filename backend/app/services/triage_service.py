@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from fastapi import HTTPException, status
 from decimal import Decimal
 
-from app.models import Patient, TriagePrediction, User
+from app.models import Patient, TriagePrediction, User, DepartmentOccupancy
 from app.schemas import (
     TriagePredictionCreate,
     TriagePredictionResponse,
@@ -46,6 +46,18 @@ TEMPLATE_TO_DEPARTMENT = {
     "kontrola": "Interna",
     "receptura": "Interna"
 }
+
+DEPARTMENT_CAPACITY = {
+    "SOR": 50,
+    "Interna": 40,
+    "Kardiologia": 30,
+    "Chirurgia": 35,
+    "Ortopedia": 25,
+    "Neurologia": 20,
+    "Pediatria": 30,
+    "Ginekologia": 20
+}
+
 
 class TriageService:
     """Service do zarządzania triażem i predykcjami ML"""
@@ -367,254 +379,248 @@ class TriageService:
             period_start=date_from,
             period_end=date_to
         )
-
-
-
-@staticmethod
-def preview_triage(preview_request: TriagePreviewRequest) -> TriagePreviewResponse:
-    """
-    Wykonuje predykcję BEZ tworzenia pacjenta
     
-    Args:
-        preview_request: Dane pacjenta do predykcji
+    @staticmethod
+    def preview_triage(preview_request: TriagePreviewRequest) -> TriagePreviewResponse:
+        """
+        Wykonuje predykcję BEZ tworzenia pacjenta
         
-    Returns:
-        Podgląd predykcji z sugestiami
+        Args:
+            preview_request: Dane pacjenta do predykcji
+            
+        Returns:
+            Podgląd predykcji z sugestiami
+            
+        Raises:
+            HTTPException: Jeśli model nie działa
+        """
+        # Przygotuj dane dla modelu
+        patient_data = {
+            "wiek": preview_request.wiek,
+            "plec": preview_request.plec,
+            "tetno": float(preview_request.tetno),
+            "cisnienie_skurczowe": float(preview_request.cisnienie_skurczowe),
+            "cisnienie_rozkurczowe": float(preview_request.cisnienie_rozkurczowe),
+            "temperatura": float(preview_request.temperatura),
+            "saturacja": float(preview_request.saturacja),
+            "gcs": preview_request.gcs,
+            "bol": preview_request.bol,
+            "czestotliwosc_oddechow": float(preview_request.czestotliwosc_oddechow),
+            "czas_od_objawow_h": float(preview_request.czas_od_objawow_h),
+            "szablon_przypadku": preview_request.szablon_przypadku
+        }
         
-    Raises:
-        HTTPException: Jeśli model nie działa
-    """
-    # Przygotuj dane dla modelu
-    patient_data = {
-        "wiek": preview_request.wiek,
-        "plec": preview_request.plec,
-        "tetno": float(preview_request.tetno),
-        "cisnienie_skurczowe": float(preview_request.cisnienie_skurczowe),
-        "cisnienie_rozkurczowe": float(preview_request.cisnienie_rozkurczowe),
-        "temperatura": float(preview_request.temperatura),
-        "saturacja": float(preview_request.saturacja),
-        "gcs": preview_request.gcs,
-        "bol": preview_request.bol,
-        "czestotliwosc_oddechow": float(preview_request.czestotliwosc_oddechow),
-        "czas_od_objawow_h": float(preview_request.czas_od_objawow_h),
-        "szablon_przypadku": preview_request.szablon_przypadku
-    }
-    
-    # Wykonaj predykcję
-    try:
-        prediction_result = predictor.predict(patient_data)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Model prediction failed: {str(e)}"
+        # Wykonaj predykcję
+        try:
+            prediction_result = predictor.predict(patient_data)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Model prediction failed: {str(e)}"
+            )
+        
+        category = prediction_result["category"]
+        probabilities = prediction_result["probabilities"]
+        confidence = prediction_result["confidence"]
+        
+        # Określ sugerowany oddział
+        if preview_request.szablon_przypadku and preview_request.szablon_przypadku in TEMPLATE_TO_DEPARTMENT:
+            assigned_department = TEMPLATE_TO_DEPARTMENT[preview_request.szablon_przypadku]
+        else:
+            assigned_department = CATEGORY_TO_DEPARTMENT.get(category, "SOR")
+        
+        # Przygotuj opis kategorii
+        category_descriptions = {
+            1: "NATYCHMIASTOWY - Resuscytacja, zagrożenie życia",
+            2: "PILNY - Bardzo pilny, ciężki stan",
+            3: "STABILNY - Pilny, stabilny pacjent",
+            4: "NISKI PRIORYTET - Mniej pilny",
+            5: "BARDZO NISKI - Nieistotny"
+        }
+        
+        priority_labels = {
+            1: "RESUSCYTACJA",
+            2: "CIĘŻKI STAN",
+            3: "STABILNY",
+            4: "NISKI",
+            5: "BARDZO NISKI"
+        }
+        
+        # Lista wszystkich dostępnych oddziałów
+        available_departments = list(DEPARTMENT_CAPACITY.keys())
+        
+        return TriagePreviewResponse(
+            kategoria_triazu=category,
+            probabilities=probabilities,
+            przypisany_oddzial=assigned_department,
+            confidence_score=confidence,
+            model_version=prediction_result.get("model_version", "unknown"),
+            priorytet=priority_labels[category],
+            opis_kategorii=category_descriptions[category],
+            dostepne_oddzialy=available_departments
         )
     
-    category = prediction_result["category"]
-    probabilities = prediction_result["probabilities"]
-    confidence = prediction_result["confidence"]
-    
-    # Określ sugerowany oddział
-    if preview_request.szablon_przypadku and preview_request.szablon_przypadku in TEMPLATE_TO_DEPARTMENT:
-        assigned_department = TEMPLATE_TO_DEPARTMENT[preview_request.szablon_przypadku]
-    else:
-        assigned_department = CATEGORY_TO_DEPARTMENT.get(category, "SOR")
-    
-    # Przygotuj opis kategorii
-    category_descriptions = {
-        1: "NATYCHMIASTOWY - Resuscytacja, zagrożenie życia",
-        2: "PILNY - Bardzo pilny, ciężki stan",
-        3: "STABILNY - Pilny, stabilny pacjent",
-        4: "NISKI PRIORYTET - Mniej pilny",
-        5: "BARDZO NISKI - Nieistotny"
-    }
-    
-    priority_labels = {
-        1: "RESUSCYTACJA",
-        2: "CIĘŻKI STAN",
-        3: "STABILNY",
-        4: "NISKI",
-        5: "BARDZO NISKI"
-    }
-    
-    # Lista wszystkich dostępnych oddziałów
-    available_departments = list(DEPARTMENT_CAPACITY.keys())
-    
-    return TriagePreviewResponse(
-        kategoria_triazu=category,
-        probabilities=probabilities,
-        przypisany_oddzial=assigned_department,
-        confidence_score=confidence,
-        model_version=prediction_result.get("model_version", "unknown"),
-        priorytet=priority_labels[category],
-        opis_kategorii=category_descriptions[category],
-        dostepne_oddzialy=available_departments
-    )
-
-
-@staticmethod
-def confirm_and_create_patient(
-    db: Session,
-    confirm_request: TriageConfirmRequest,
-    user_id: int,
-    ip_address: Optional[str] = None
-) -> TriageConfirmResponse:
-    """
-    Potwierdza predykcję i tworzy pacjenta w bazie
-    
-    Args:
-        db: Sesja bazy danych
-        confirm_request: Potwierdzone dane pacjenta
-        user_id: ID użytkownika
-        ip_address: Adres IP
+    @staticmethod
+    def confirm_and_create_patient(
+        db: Session,
+        confirm_request: TriageConfirmRequest,
+        user_id: int,
+        ip_address: Optional[str] = None
+    ) -> TriageConfirmResponse:
+        """
+        Potwierdza predykcję i tworzy pacjenta w bazie
         
-    Returns:
-        Potwierdzenie utworzenia pacjenta
+        Args:
+            db: Sesja bazy danych
+            confirm_request: Potwierdzone dane pacjenta
+            user_id: ID użytkownika
+            ip_address: Adres IP
+            
+        Returns:
+            Potwierdzenie utworzenia pacjenta
+            
+        Raises:
+            HTTPException: W przypadku błędów
+        """
+        # Najpierw zrób predykcję żeby mieć oryginalne wartości
+        preview_request = TriagePreviewRequest(**confirm_request.model_dump(exclude={'kategoria_triazu', 'przypisany_oddzial'}))
+        original_prediction = TriageService.preview_triage(preview_request)
         
-    Raises:
-        HTTPException: W przypadku błędów
-    """
-    # Najpierw zrób predykcję żeby mieć oryginalne wartości
-    preview_request = TriagePreviewRequest(**confirm_request.model_dump(exclude={'kategoria_triazu', 'przypisany_oddzial'}))
-    original_prediction = TriageService.preview_triage(preview_request)
+        # Sprawdź czy wartości zostały zmienione
+        was_modified = (
+            confirm_request.kategoria_triazu != original_prediction.kategoria_triazu or
+            confirm_request.przypisany_oddzial != original_prediction.przypisany_oddzial
+        )
+        
+        # Utwórz pacjenta
+        patient = Patient(
+            wiek=confirm_request.wiek,
+            plec=confirm_request.plec,
+            tetno=Decimal(str(confirm_request.tetno)),
+            cisnienie_skurczowe=Decimal(str(confirm_request.cisnienie_skurczowe)),
+            cisnienie_rozkurczowe=Decimal(str(confirm_request.cisnienie_rozkurczowe)),
+            temperatura=Decimal(str(confirm_request.temperatura)),
+            saturacja=Decimal(str(confirm_request.saturacja)),
+            gcs=confirm_request.gcs,
+            bol=confirm_request.bol,
+            czestotliwosc_oddechow=Decimal(str(confirm_request.czestotliwosc_oddechow)),
+            czas_od_objawow_h=Decimal(str(confirm_request.czas_od_objawow_h)),
+            szablon_przypadku=confirm_request.szablon_przypadku,
+            status='oczekujący',
+            wprowadzony_przez=user_id
+        )
+        
+        db.add(patient)
+        db.flush()  # Żeby dostać ID pacjenta
+        
+        # Utwórz predykcję (z potencjalnymi modyfikacjami)
+        prediction = TriagePrediction(
+            patient_id=patient.id,
+            kategoria_triazu=confirm_request.kategoria_triazu,
+            prob_kat_1=Decimal(str(original_prediction.probabilities["1"])),
+            prob_kat_2=Decimal(str(original_prediction.probabilities["2"])),
+            prob_kat_3=Decimal(str(original_prediction.probabilities["3"])),
+            prob_kat_4=Decimal(str(original_prediction.probabilities["4"])),
+            prob_kat_5=Decimal(str(original_prediction.probabilities["5"])),
+            przypisany_oddzial=confirm_request.przypisany_oddzial,
+            oddzial_docelowy=confirm_request.przypisany_oddzial,
+            model_version=original_prediction.model_version,
+            confidence_score=Decimal(str(original_prediction.confidence_score))
+        )
+        
+        db.add(prediction)
+        
+        # KLUCZOWE: Zaktualizuj obłożenie oddziału
+        TriageService._increment_department_occupancy(
+            db=db,
+            department=confirm_request.przypisany_oddzial
+        )
+        
+        db.commit()
+        db.refresh(patient)
+        db.refresh(prediction)
+        
+        # Loguj akcję
+        log_action(
+            db=db,
+            user_id=user_id,
+            action="CREATE_PATIENT_WITH_TRIAGE",
+            table_name="patients",
+            record_id=patient.id,
+            new_values={
+                "patient_id": patient.id,
+                "kategoria_triazu": confirm_request.kategoria_triazu,
+                "przypisany_oddzial": confirm_request.przypisany_oddzial,
+                "was_modified": was_modified,
+                "original_category": original_prediction.kategoria_triazu if was_modified else None,
+                "original_department": original_prediction.przypisany_oddzial if was_modified else None
+            },
+            ip_address=ip_address
+        )
+        
+        return TriageConfirmResponse(
+            patient_id=patient.id,
+            kategoria_triazu=confirm_request.kategoria_triazu,
+            przypisany_oddzial=confirm_request.przypisany_oddzial,
+            confidence_score=original_prediction.confidence_score,
+            model_version=original_prediction.model_version,
+            created_at=patient.data_przyjecia,
+            was_modified=was_modified,
+            original_category=original_prediction.kategoria_triazu if was_modified else None,
+            original_department=original_prediction.przypisany_oddzial if was_modified else None
+        )
     
-    # Sprawdź czy wartości zostały zmienione
-    was_modified = (
-        confirm_request.kategoria_triazu != original_prediction.kategoria_triazu or
-        confirm_request.przypisany_oddzial != original_prediction.przypisany_oddzial
-    )
-    
-    # Utwórz pacjenta
-    patient = Patient(
-        wiek=confirm_request.wiek,
-        plec=confirm_request.plec,
-        tetno=Decimal(str(confirm_request.tetno)),
-        cisnienie_skurczowe=Decimal(str(confirm_request.cisnienie_skurczowe)),
-        cisnienie_rozkurczowe=Decimal(str(confirm_request.cisnienie_rozkurczowe)),
-        temperatura=Decimal(str(confirm_request.temperatura)),
-        saturacja=Decimal(str(confirm_request.saturacja)),
-        gcs=confirm_request.gcs,
-        bol=confirm_request.bol,
-        czestotliwosc_oddechow=Decimal(str(confirm_request.czestotliwosc_oddechow)),
-        czas_od_objawow_h=Decimal(str(confirm_request.czas_od_objawow_h)),
-        szablon_przypadku=confirm_request.szablon_przypadku,
-        status='oczekujący',
-        wprowadzony_przez=user_id
-    )
-    
-    db.add(patient)
-    db.flush()  # Żeby dostać ID pacjenta
-    
-    # Utwórz predykcję (z potencjalnymi modyfikacjami)
-    prediction = TriagePrediction(
-        patient_id=patient.id,
-        kategoria_triazu=confirm_request.kategoria_triazu,
-        prob_kat_1=Decimal(str(original_prediction.probabilities["1"])),
-        prob_kat_2=Decimal(str(original_prediction.probabilities["2"])),
-        prob_kat_3=Decimal(str(original_prediction.probabilities["3"])),
-        prob_kat_4=Decimal(str(original_prediction.probabilities["4"])),
-        prob_kat_5=Decimal(str(original_prediction.probabilities["5"])),
-        przypisany_oddzial=confirm_request.przypisany_oddzial,
-        oddzial_docelowy=confirm_request.przypisany_oddzial,
-        model_version=original_prediction.model_version,
-        confidence_score=Decimal(str(original_prediction.confidence_score))
-    )
-    
-    db.add(prediction)
-    
-    # KLUCZOWE: Zaktualizuj obłożenie oddziału
-    TriageService._increment_department_occupancy(
-        db=db,
-        department=confirm_request.przypisany_oddzial
-    )
-    
-    db.commit()
-    db.refresh(patient)
-    db.refresh(prediction)
-    
-    # Loguj akcję
-    log_action(
-        db=db,
-        user_id=user_id,
-        action="CREATE_PATIENT_WITH_TRIAGE",
-        table_name="patients",
-        record_id=patient.id,
-        new_values={
-            "patient_id": patient.id,
-            "kategoria_triazu": confirm_request.kategoria_triazu,
-            "przypisany_oddzial": confirm_request.przypisany_oddzial,
-            "was_modified": was_modified,
-            "original_category": original_prediction.kategoria_triazu if was_modified else None,
-            "original_department": original_prediction.przypisany_oddzial if was_modified else None
-        },
-        ip_address=ip_address
-    )
-    
-    return TriageConfirmResponse(
-        patient_id=patient.id,
-        kategoria_triazu=confirm_request.kategoria_triazu,
-        przypisany_oddzial=confirm_request.przypisany_oddzial,
-        confidence_score=original_prediction.confidence_score,
-        model_version=original_prediction.model_version,
-        created_at=patient.data_przyjecia,
-        was_modified=was_modified,
-        original_category=original_prediction.kategoria_triazu if was_modified else None,
-        original_department=original_prediction.przypisany_oddzial if was_modified else None
-    )
-
-
-@staticmethod
-def _increment_department_occupancy(db: Session, department: str):
-    """
-    Inkrementuje obłożenie oddziału w najnowszym rekordzie
-    
-    Args:
-        db: Sesja bazy danych
-        department: Nazwa oddziału
-    """
-    # Pobierz najnowszy rekord obłożenia
-    latest = db.query(DepartmentOccupancy).order_by(
-        DepartmentOccupancy.timestamp.desc()
-    ).first()
-    
-    if not latest:
-        # Jeśli nie ma żadnych rekordów, utwórz nowy z wartościami zerowymi
-        occupancy_data = {
-            "timestamp": datetime.now(),
-            "sor": 0,
-            "interna": 0,
-            "kardiologia": 0,
-            "chirurgia": 0,
-            "ortopedia": 0,
-            "neurologia": 0,
-            "pediatria": 0,
-            "ginekologia": 0
-        }
-        latest = DepartmentOccupancy(**occupancy_data)
-        db.add(latest)
-    
-    # Sprawdź czy najnowszy rekord jest stary (>5 min)
-    # Jeśli tak, utwórz nowy rekord z zaktualizowanymi wartościami
-    time_diff = datetime.now() - latest.timestamp
-    if time_diff.total_seconds() > 300:  # 5 minut
-        # Utwórz nowy rekord z aktualnym timestamp
-        occupancy_data = {
-            "timestamp": datetime.now(),
-            "sor": latest.sor,
-            "interna": latest.interna,
-            "kardiologia": latest.kardiologia,
-            "chirurgia": latest.chirurgia,
-            "ortopedia": latest.ortopedia,
-            "neurologia": latest.neurologia,
-            "pediatria": latest.pediatria,
-            "ginekologia": latest.ginekologia
-        }
-        latest = DepartmentOccupancy(**occupancy_data)
-        db.add(latest)
-    
-    # Inkrementuj odpowiedni oddział
-    dept_key = department.lower()
-    if hasattr(latest, dept_key):
-        current_value = getattr(latest, dept_key) or 0
-        setattr(latest, dept_key, current_value + 1)
-    
-    db.commit()
+    @staticmethod
+    def _increment_department_occupancy(db: Session, department: str):
+        """
+        Inkrementuje obłożenie oddziału w najnowszym rekordzie
+        
+        Args:
+            db: Sesja bazy danych
+            department: Nazwa oddziału
+        """
+        # Pobierz najnowszy rekord obłożenia
+        latest = db.query(DepartmentOccupancy).order_by(
+            DepartmentOccupancy.timestamp.desc()
+        ).first()
+        
+        if not latest:
+            # Jeśli nie ma żadnych rekordów, utwórz nowy z wartościami zerowymi
+            occupancy_data = {
+                "timestamp": datetime.now(),
+                "sor": 0,
+                "interna": 0,
+                "kardiologia": 0,
+                "chirurgia": 0,
+                "ortopedia": 0,
+                "neurologia": 0,
+                "pediatria": 0,
+                "ginekologia": 0
+            }
+            latest = DepartmentOccupancy(**occupancy_data)
+            db.add(latest)
+        
+        time_diff = datetime.now() - latest.timestamp
+        if time_diff.total_seconds() > 300:  # 5 minut
+            # Utwórz nowy rekord z aktualnym timestamp
+            occupancy_data = {
+                "timestamp": datetime.now(),
+                "sor": latest.sor,
+                "interna": latest.interna,
+                "kardiologia": latest.kardiologia,
+                "chirurgia": latest.chirurgia,
+                "ortopedia": latest.ortopedia,
+                "neurologia": latest.neurologia,
+                "pediatria": latest.pediatria,
+                "ginekologia": latest.ginekologia
+            }
+            latest = DepartmentOccupancy(**occupancy_data)
+            db.add(latest)
+        
+        # Inkrementuj odpowiedni oddział
+        dept_key = department.lower()
+        if hasattr(latest, dept_key):
+            current_value = getattr(latest, dept_key) or 0
+            setattr(latest, dept_key, current_value + 1)
+        
+        db.commit()

@@ -59,10 +59,10 @@ def generate_department_occupancy(hour, day_of_week):
     is_peak_hours = 8 <= hour <= 20
     
     for dept, capacity in DEPARTMENT_CAPACITY.items():
-        base_rate = random.uniform(0.3, 0.7)
+        base_rate = random.uniform(0.15, 0.55)
         
         if dept == "SOR":
-            base_rate = random.uniform(0.5, 0.85)
+            base_rate = random.uniform(0.6, 0.85)
             if 18 <= hour <= 23:  # Wieczorny szczyt
                 base_rate = min(0.95, base_rate + 0.15)
         
@@ -97,12 +97,8 @@ def seed_database(days=7, hours_per_day=24):
         days: Liczba dni wstecz do wygenerowania danych (domyślnie 7)
         hours_per_day: Liczba pomiarów na dzień (domyślnie 24 - co godzinę)
     """
-    print("="*70)
-    print("SEEDER BAZY DANYCH - OBŁOŻENIE ODDZIAŁÓW")
-    print("="*70)
     
     database_url = get_database_url()
-    print(f"\n📊 Łączenie z bazą danych...")
     
     try:
         engine = create_engine(database_url)
@@ -119,9 +115,9 @@ def seed_database(days=7, hours_per_day=24):
     try:
         result = db.execute(text("DELETE FROM department_occupancy"))
         db.commit()
-        print(f"✓ Usunięto {result.rowcount} starych wpisów")
+        print(f" Usunięto {result.rowcount} starych wpisów")
     except Exception as e:
-        print(f"⚠ Nie można wyczyścić starych danych: {e}")
+        print(f" Nie można wyczyścić starych danych: {e}")
         db.rollback()
     
     total_records = days * hours_per_day
@@ -167,7 +163,7 @@ def seed_database(days=7, hours_per_day=24):
                 print(f"\r   [{bar}] {progress:.1f}% ({records_created}/{total_records})", end='')
                 
             except Exception as e:
-                print(f"\n❌ Błąd podczas wstawiania danych: {e}")
+                print(f"\n Błąd podczas wstawiania danych: {e}")
                 db.rollback()
                 continue
     
