@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createPatient, predictTriage } from '../services/api';
+import { previewTriage } from '../services/api';
 import TemplateSelect from './TemplateSelect';
 
 const TriageForm = ({ onPredictionComplete }) => {
@@ -35,6 +35,7 @@ const TriageForm = ({ onPredictionComplete }) => {
     setLoading(true);
 
     try {
+      // Przygotuj dane
       const patientData = {
         ...formData,
         wiek: parseInt(formData.wiek),
@@ -50,12 +51,16 @@ const TriageForm = ({ onPredictionComplete }) => {
         szablon_przypadku: formData.szablon_przypadku || null
       };
 
-      const patient = await createPatient(patientData);
+      // 🔥 ZMIANA: Używamy preview zamiast tworzyć pacjenta
+      const prediction = await previewTriage(patientData);
 
-      const prediction = await predictTriage(patient.id);
+      // Przekaż ORYGINALNE dane formularza + predykcję do rodzica
+      onPredictionComplete({ 
+        formData: patientData,  // Oryginalne dane do późniejszego utworzenia pacjenta
+        prediction              // Predykcja modelu
+      });
 
-      onPredictionComplete({ patient, prediction });
-
+      // Wyczyść formularz
       setFormData({
         wiek: '',
         plec: 'M',
@@ -86,16 +91,23 @@ const TriageForm = ({ onPredictionComplete }) => {
     <div className="triage-form">
       <h2>Formularz Triażu</h2>
 
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
-        {/* Podstawowe dane */}
+        {/* Dane podstawowe */}
         <div className="form-section">
           <h3>Dane podstawowe</h3>
           
           <div className="form-row">
             <div className="form-group">
-              <label>Wiek (lata)</label>
+              <label htmlFor="wiek">Wiek (lata)</label>
               <input
                 type="number"
+                id="wiek"
                 name="wiek"
                 value={formData.wiek}
                 onChange={handleChange}
@@ -142,31 +154,33 @@ const TriageForm = ({ onPredictionComplete }) => {
           
           <div className="form-row">
             <div className="form-group">
-              <label>Tętno (uderzeń/min)</label>
+              <label htmlFor="tetno">Tętno (uderzeń/min)</label>
               <input
                 type="number"
+                id="tetno"
                 name="tetno"
                 value={formData.tetno}
                 onChange={handleChange}
                 required
-                min="0"
-                max="300"
                 step="0.1"
+                min="30"
+                max="220"
                 disabled={loading}
               />
             </div>
 
             <div className="form-group">
-              <label>Temperatura (°C)</label>
+              <label htmlFor="temperatura">Temperatura (°C)</label>
               <input
                 type="number"
+                id="temperatura"
                 name="temperatura"
                 value={formData.temperatura}
                 onChange={handleChange}
                 required
+                step="0.1"
                 min="30"
                 max="45"
-                step="0.1"
                 disabled={loading}
               />
             </div>
@@ -174,31 +188,33 @@ const TriageForm = ({ onPredictionComplete }) => {
 
           <div className="form-row">
             <div className="form-group">
-              <label>Ciśnienie skurczowe (mmHg)</label>
+              <label htmlFor="cisnienie_skurczowe">Ciśnienie skurczowe (mmHg)</label>
               <input
                 type="number"
+                id="cisnienie_skurczowe"
                 name="cisnienie_skurczowe"
                 value={formData.cisnienie_skurczowe}
                 onChange={handleChange}
                 required
-                min="0"
-                max="300"
                 step="0.1"
+                min="50"
+                max="250"
                 disabled={loading}
               />
             </div>
 
             <div className="form-group">
-              <label>Ciśnienie rozkurczowe (mmHg)</label>
+              <label htmlFor="cisnienie_rozkurczowe">Ciśnienie rozkurczowe (mmHg)</label>
               <input
                 type="number"
+                id="cisnienie_rozkurczowe"
                 name="cisnienie_rozkurczowe"
                 value={formData.cisnienie_rozkurczowe}
                 onChange={handleChange}
                 required
-                min="0"
-                max="200"
                 step="0.1"
+                min="30"
+                max="150"
                 disabled={loading}
               />
             </div>
@@ -206,31 +222,33 @@ const TriageForm = ({ onPredictionComplete }) => {
 
           <div className="form-row">
             <div className="form-group">
-              <label>Saturacja (%)</label>
+              <label htmlFor="saturacja">Saturacja (%)</label>
               <input
                 type="number"
+                id="saturacja"
                 name="saturacja"
                 value={formData.saturacja}
                 onChange={handleChange}
                 required
-                min="0"
-                max="100"
                 step="0.1"
+                min="50"
+                max="100"
                 disabled={loading}
               />
             </div>
 
             <div className="form-group">
-              <label>Częstotliwość oddechów (/min)</label>
+              <label htmlFor="czestotliwosc_oddechow">Częstotliwość oddechów (/min)</label>
               <input
                 type="number"
+                id="czestotliwosc_oddechow"
                 name="czestotliwosc_oddechow"
                 value={formData.czestotliwosc_oddechow}
                 onChange={handleChange}
                 required
-                min="0"
-                max="100"
                 step="0.1"
+                min="5"
+                max="60"
                 disabled={loading}
               />
             </div>
@@ -243,9 +261,10 @@ const TriageForm = ({ onPredictionComplete }) => {
           
           <div className="form-row">
             <div className="form-group">
-              <label>GCS (3-15)</label>
+              <label htmlFor="gcs">GCS (3-15)</label>
               <input
                 type="number"
+                id="gcs"
                 name="gcs"
                 value={formData.gcs}
                 onChange={handleChange}
@@ -257,9 +276,10 @@ const TriageForm = ({ onPredictionComplete }) => {
             </div>
 
             <div className="form-group">
-              <label>Ból (0-10)</label>
+              <label htmlFor="bol">Ból (0-10)</label>
               <input
                 type="number"
+                id="bol"
                 name="bol"
                 value={formData.bol}
                 onChange={handleChange}
@@ -271,43 +291,37 @@ const TriageForm = ({ onPredictionComplete }) => {
             </div>
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>Czas od objawów (godziny)</label>
-              <input
-                type="number"
-                name="czas_od_objawow_h"
-                value={formData.czas_od_objawow_h}
-                onChange={handleChange}
-                required
-                min="0"
-                step="0.1"
-                disabled={loading}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Szablon przypadku (opcjonalnie)</label>
-              <TemplateSelect
-                value={formData.szablon_przypadku}
-                onChange={handleChange}
-                name="szablon_przypadku"
-                required
-              />            </div>
-                        </div>
-                      </div>
-        {error && (
-          <div className="error-message">
-            {error}
+          <div className="form-group">
+            <label htmlFor="czas_od_objawow_h">Czas od objawów (godziny)</label>
+            <input
+              type="number"
+              id="czas_od_objawow_h"
+              name="czas_od_objawow_h"
+              value={formData.czas_od_objawow_h}
+              onChange={handleChange}
+              required
+              step="0.1"
+              min="0"
+              disabled={loading}
+            />
           </div>
-        )}
+
+          <div className="form-group">
+            <label htmlFor="szablon_przypadku">Szablon przypadku (opcjonalnie)</label>
+            <TemplateSelect
+              value={formData.szablon_przypadku}
+              onChange={handleChange}
+              disabled={loading}
+            />
+          </div>
+        </div>
 
         <button 
           type="submit" 
           className="btn-primary btn-large"
           disabled={loading}
         >
-          {loading ? 'Przetwarzanie...' : 'Wykonaj Triąż'}
+          {loading ? 'Przetwarzanie...' : 'Wykonaj Triaz'}
         </button>
       </form>
     </div>

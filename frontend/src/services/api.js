@@ -92,11 +92,41 @@ export const getAvailableTemplates = async () => {
   return response.data;
 };
 
+/**
+ * Podgląd predykcji BEZ tworzenia pacjenta
+ * @param {Object} patientData - Dane pacjenta
+ * @returns {Promise} Predykcja modelu z sugestiami
+ */
+export const previewTriage = async (patientData) => {
+  const response = await api.post('/triage/preview', patientData);
+  return response.data;
+};
+
+/**
+ * Potwierdza predykcję i tworzy pacjenta w bazie
+ * @param {Object} confirmData - Potwierdzone dane (z opcjonalnymi zmianami)
+ * @returns {Promise} Potwierdzenie utworzenia pacjenta
+ */
+export const confirmAndCreatePatient = async (confirmData) => {
+  const response = await api.post('/triage/confirm', confirmData);
+  return response.data;
+};
+
+
 // ============================================================================
 // DEPARTMENTS
 // ============================================================================
 
 export const getDepartmentOccupancy = async () => {
+  const response = await api.get('/departments/occupancy');
+  return response.data;
+};
+
+/**
+ * Wymusza odświeżenie danych heatmapy
+ * (po dodaniu pacjenta obłożenie powinno się zaktualizować)
+ */
+export const refreshDepartmentOccupancy = async () => {
   const response = await api.get('/departments/occupancy');
   return response.data;
 };

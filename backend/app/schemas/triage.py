@@ -80,3 +80,68 @@ class TriageAnalytics(BaseModel):
     model_version: str
     period_start: datetime
     period_end: datetime
+
+
+class TriagePreviewRequest(BaseModel):
+    """Request do podglądu predykcji bez tworzenia pacjenta"""
+    wiek: int = Field(..., ge=0, le=120)
+    plec: str = Field(..., pattern="^[MK]$")
+    tetno: float = Field(..., ge=30, le=220)
+    cisnienie_skurczowe: float = Field(..., ge=50, le=250)
+    cisnienie_rozkurczowe: float = Field(..., ge=30, le=150)
+    temperatura: float = Field(..., ge=30, le=45)
+    saturacja: float = Field(..., ge=50, le=100)
+    gcs: int = Field(..., ge=3, le=15)
+    bol: int = Field(..., ge=0, le=10)
+    czestotliwosc_oddechow: float = Field(..., ge=5, le=60)
+    czas_od_objawow_h: float = Field(..., ge=0)
+    szablon_przypadku: Optional[str] = None
+
+
+class TriagePreviewResponse(BaseModel):
+    """Odpowiedź z podglądem predykcji"""
+    kategoria_triazu: int
+    probabilities: Dict[str, float]
+    przypisany_oddzial: str
+    confidence_score: float
+    model_version: str
+    
+    # Dodatkowe informacje dla użytkownika
+    priorytet: str  # "RESUSCYTACJA", "CIĘŻKI STAN", etc.
+    opis_kategorii: str
+    dostepne_oddzialy: list[str]  # Lista wszystkich dostępnych oddziałów
+
+
+class TriageConfirmRequest(BaseModel):
+    """Request do potwierdzenia i utworzenia pacjenta"""
+    # Dane pacjenta
+    wiek: int = Field(..., ge=0, le=120)
+    plec: str = Field(..., pattern="^[MK]$")
+    tetno: float = Field(..., ge=30, le=220)
+    cisnienie_skurczowe: float = Field(..., ge=50, le=250)
+    cisnienie_rozkurczowe: float = Field(..., ge=30, le=150)
+    temperatura: float = Field(..., ge=30, le=45)
+    saturacja: float = Field(..., ge=50, le=100)
+    gcs: int = Field(..., ge=3, le=15)
+    bol: int = Field(..., ge=0, le=10)
+    czestotliwosc_oddechow: float = Field(..., ge=5, le=60)
+    czas_od_objawow_h: float = Field(..., ge=0)
+    szablon_przypadku: Optional[str] = None
+    
+    # Potwierdzone wartości (mogą być zmienione przez użytkownika)
+    kategoria_triazu: int = Field(..., ge=1, le=5)
+    przypisany_oddzial: str
+
+
+class TriageConfirmResponse(BaseModel):
+    """Odpowiedź po potwierdzeniu i utworzeniu pacjenta"""
+    patient_id: int
+    kategoria_triazu: int
+    przypisany_oddzial: str
+    confidence_score: float
+    model_version: str
+    created_at: datetime
+    
+    was_modified: bool
+    original_category: Optional[int] = None
+    original_department: Optional[str] = None

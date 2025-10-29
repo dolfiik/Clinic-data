@@ -1,7 +1,7 @@
 const TriageResult = ({ result, onClose }) => {
   if (!result) return null;
 
-  const { patient, prediction } = result;
+  const { prediction } = result;
 
   const getCategoryInfo = (category) => {
     const categories = {
@@ -64,67 +64,6 @@ const TriageResult = ({ result, onClose }) => {
           <div className="result-value">
             {(prediction.confidence_score * 100).toFixed(1)}%
           </div>
-        </div>
-
-        {/* Rozkład prawdopodobieństw */}
-        <div className="result-section">
-          <h3>Rozkład prawdopodobieństw</h3>
-          <div className="probability-bars">
-            {[1, 2, 3, 4, 5].map(cat => {
-              const prob = prediction[`prob_kat_${cat}`] * 100;
-              const info = getCategoryInfo(cat);
-              return (
-                <div key={cat} className="probability-item">
-                  <div className="probability-label">
-                    Kat. {cat}
-                  </div>
-                  <div className="probability-bar-container">
-                    <div 
-                      className="probability-bar"
-                      style={{ 
-                        width: `${prob}%`,
-                        backgroundColor: info.color
-                      }}
-                    />
-                  </div>
-                  <div className="probability-value">
-                    {prob.toFixed(1)}%
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Informacje o pacjencie */}
-        <div className="result-section">
-          <h3>Dane pacjenta</h3>
-          <div className="patient-info">
-            <div className="info-item">
-              <span className="info-label">ID:</span>
-              <span className="info-value">#{patient.id}</span>
-            </div>
-            <div className="info-item">
-              <span className="info-label">Wiek:</span>
-              <span className="info-value">{patient.wiek} lat</span>
-            </div>
-            <div className="info-item">
-              <span className="info-label">Płeć:</span>
-              <span className="info-value">{patient.plec === 'M' ? 'Mężczyzna' : 'Kobieta'}</span>
-            </div>
-            <div className="info-item">
-              <span className="info-label">Status:</span>
-              <span className="info-value">{patient.status}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Model info */}
-        <div className="result-section model-info">
-          <small>
-            Model: {prediction.model_version} | 
-            Czas predykcji: {new Date(prediction.predicted_at).toLocaleString('pl-PL')}
-          </small>
         </div>
       </div>
     </div>

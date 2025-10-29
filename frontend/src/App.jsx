@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import LoginForm from './components/LoginForm';
 import TriageForm from './components/TriageForm';
 import TriageResult from './components/TriageResult';
@@ -10,6 +10,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [triageResult, setTriageResult] = useState(null);
+  const heatMapRef = useRef(null);
 
   useEffect(() => {
     const token = getAuthToken();
@@ -29,6 +30,7 @@ function App() {
       setIsLoggedIn(true);
     }, 100);
   };
+
   const handleLogout = async () => {
     await logout();
     setIsLoggedIn(false);
@@ -42,6 +44,19 @@ function App() {
 
   const handleCloseResult = () => {
     setTriageResult(null);
+  };
+
+  // NOWE: Callback po utworzeniu pacjenta
+  const handlePatientCreated = (response) => {
+    console.log('Pacjent utworzony:', response);
+    
+    // Odśwież heatmapę
+    if (heatMapRef.current && heatMapRef.current.refresh) {
+      heatMapRef.current.refresh();
+    }
+    
+    // Można dodać toast notification
+    // toast.success(`Pacjent #${response.patient_id} dodany do systemu!`);
   };
 
   if (!isLoggedIn) {
@@ -71,13 +86,19 @@ function App() {
             <TriageResult 
               result={triageResult} 
               onClose={handleCloseResult}
+              onPatientCreated={handlePatientCreated}
             />
           )}
         </div>
 
         {/* Prawa strona - HeatMap */}
         <div className="right-panel">
-            {isLoggedIn && user && <HeatMap isLoggedIn={isLoggedIn} />}
+          {isLoggedIn && user && (
+            <HeatMap 
+              ref={heatMapRef}
+              isLoggedIn={isLoggedIn} 
+            />
+          )}
         </div>
       </div>
     </div>

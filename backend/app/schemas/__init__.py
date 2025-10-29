@@ -19,7 +19,11 @@ from app.schemas.triage import (
     TriageStatsResponse,
     DailyTriageStats,
     CategoryDistribution,
-    TriageAnalytics
+    TriageAnalytics,
+    TriagePreviewRequest,
+    TriagePreviewResponse,
+    TriageConfirmRequest,
+    TriageConfirmResponse
 )
 from app.schemas.department import (
     DepartmentOccupancyBase,
@@ -71,6 +75,10 @@ __all__ = [
     "DailyTriageStats",
     "CategoryDistribution",
     "TriageAnalytics",
+    "TriagePreviewRequest",
+    "TriagePreviewResponse",
+    "TriageConfirmRequest",
+    "TriageConfirmResponse",
     # Department
     "DepartmentOccupancyBase",
     "DepartmentOccupancyCreate",

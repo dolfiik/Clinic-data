@@ -25,6 +25,7 @@ const LoginForm = ({ onLoginSuccess }) => {
       setLoading(false);
     }
   };
+
   return (
     <div className="login-container">
       <div className="login-box">
@@ -72,12 +73,6 @@ const LoginForm = ({ onLoginSuccess }) => {
             {loading ? 'Logowanie...' : 'Zaloguj się'}
           </button>
         </form>
-
-        <div className="login-info">
-          <p>Testowe konto:</p>
-          <p>Email: dr.kowalski@clinic.local</p>
-          <p>Hasło: password123</p>
-        </div>
       </div>
     </div>
   );

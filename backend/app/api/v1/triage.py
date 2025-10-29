@@ -9,7 +9,10 @@ from app.schemas import (
     TriagePredictionResponse,
     TriageStatsResponse,
     DailyTriageStats,
-    TriageAnalytics
+    TriageAnalytics,
+    TriageConfirmRequest,
+    TriageConfirmResponse,
+
 )
 from app.services import TriageService
 from app.ml.predictor import predictor
@@ -330,3 +333,72 @@ async def get_available_templates():
         })
     
     return templates
+
+
+
+@router.post("/preview", response_model=TriagePreviewResponse)
+async def preview_triage(
+    preview_request: TriagePreviewRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Podgląd predykcji triaży BEZ tworzenia pacjenta
+    
+    **Wymaga:** Bearer Token
+    
+    **Parametry:**
+    - Wszystkie dane pacjenta (wiek, płeć, parametry vitalne)
+    
+    **Zwraca:**
+    - Przewidywaną kategorię triaży (1-5)
+    - Prawdopodobieństwa dla każdej kategorii
+    - Sugerowany oddział
+    - Pewność predykcji
+    - Listę dostępnych oddziałów (do wyboru)
+    - Opis kategorii i priorytetu
+    
+    **UWAGA:** Ta operacja NIE tworzy pacjenta w bazie!
+    Jest to tylko podgląd predykcji ML.
+    """
+    return TriageService.preview_triage(preview_request)
+
+
+@router.post("/confirm", response_model=TriageConfirmResponse, status_code=201)
+async def confirm_and_create_patient(
+    confirm_request: TriageConfirmRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Potwierdza predykcję i tworzy pacjenta w bazie
+    
+    **Wymaga:** Bearer Token
+    
+    **Parametry:**
+    - Wszystkie dane pacjenta
+    - kategoria_triazu: Potwierdzona kategoria (może być zmieniona!)
+    - przypisany_oddzial: Potwierdzony oddział (może być zmieniony!)
+    
+    **Zwraca:**
+    - ID utworzonego pacjenta
+    - Ostateczną kategorię i oddział
+    - Informację czy wartości zostały zmienione przez użytkownika
+    
+    **Proces:**
+    1. Tworzy pacjenta w bazie
+    2. Zapisuje predykcję (z potencjalnymi modyfikacjami)
+    3. Aktualizuje obłożenie oddziału (department_occupancy)
+    4. Loguje akcję w audit log
+    5. Zwraca potwierdzenie
+    
+    **WAŻNE:** To jest jedyne miejsce gdzie pacjent jest faktycznie tworzony!
+    """
+    ip_address = get_ip_address(request)
+    
+    return TriageService.confirm_and_create_patient(
+        db=db,
+        confirm_request=confirm_request,
+        user_id=current_user.id,
+        ip_address=ip_address
+    )

@@ -1,19 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { getDepartmentOccupancy } from '../services/api';
 
-const HeatMap = ({ isLoggedIn }) => {
+const HeatMap = forwardRef(({ isLoggedIn }, ref) => {
   const [occupancy, setOccupancy] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  useImperativeHandle(ref, () => ({
+    refresh: () => {
+      fetchOccupancy();
+    }
+  }));
+
   useEffect(() => {
-    
     if (!isLoggedIn) {
       setLoading(false);
       return;
     }
 
-    // Małe opóźnienie dla pewności że token jest zapisany
     const timer = setTimeout(() => {
       fetchOccupancy();
     }, 150);
@@ -27,8 +31,6 @@ const HeatMap = ({ isLoggedIn }) => {
   }, [isLoggedIn]);
 
   const fetchOccupancy = async () => {
-    const token = localStorage.getItem('token');
-    
     try {
       const data = await getDepartmentOccupancy();
       setOccupancy(data);
@@ -40,11 +42,12 @@ const HeatMap = ({ isLoggedIn }) => {
     }
   };
 
+  // Nowy gradient kolorów z lepszym kontrastem
   const getOccupancyColor = (percentage) => {
-    if (percentage >= 80) return '#2d5016'; // Ciemny zielony (CRITICAL)
-    if (percentage >= 60) return '#6b9c3d'; // Średni zielony (HIGH)
-    if (percentage >= 40) return '#a7eb67'; // Główny zielony (MEDIUM)
-    return '#d4f5b3'; // Jasny zielony (LOW)
+    if (percentage >= 80) return '#c62828'; // Ciemny czerwony (CRITICAL)
+    if (percentage >= 60) return '#f57c00'; // Pomarańczowy (HIGH)
+    if (percentage >= 40) return '#fbc02d'; // Żółty (MEDIUM)
+    return '#a7eb67'; // Jasny zielony (LOW)
   };
 
   const getStatusLabel = (percentage) => {
@@ -52,6 +55,13 @@ const HeatMap = ({ isLoggedIn }) => {
     if (percentage >= 60) return 'WYSOKIE';
     if (percentage >= 40) return 'ŚREDNIE';
     return 'NISKIE';
+  };
+
+  const getStatusColor = (percentage) => {
+    if (percentage >= 80) return '#c62828';
+    if (percentage >= 60) return '#f57c00';
+    if (percentage >= 40) return '#fbc02d';
+    return '#7cb342';
   };
 
   if (loading) {
@@ -107,7 +117,6 @@ const HeatMap = ({ isLoggedIn }) => {
           <div 
             key={dept.name}
             className="department-card"
-            style={{ backgroundColor: getOccupancyColor(dept.occupancy_percentage) }}
           >
             <h3>{dept.name}</h3>
             <div className="occupancy-info">
@@ -116,10 +125,19 @@ const HeatMap = ({ isLoggedIn }) => {
                 <span className="occupancy-separator">/</span>
                 <span className="occupancy-capacity">{dept.capacity}</span>
               </div>
-              <div className="occupancy-percentage">
+              <div 
+                className="occupancy-percentage"
+                style={{ color: getStatusColor(dept.occupancy_percentage) }}
+              >
                 {dept.occupancy_percentage.toFixed(1)}%
               </div>
-              <div className={`status-badge status-${dept.status.toLowerCase()}`}>
+              <div 
+                className="status-badge"
+                style={{ 
+                  backgroundColor: getOccupancyColor(dept.occupancy_percentage),
+                  color: 'white'
+                }}
+              >
                 {getStatusLabel(dept.occupancy_percentage)}
               </div>
               <div className="available-beds">
@@ -134,25 +152,27 @@ const HeatMap = ({ isLoggedIn }) => {
         <h4>Legenda:</h4>
         <div className="legend-items">
           <div className="legend-item">
-            <div className="legend-color" style={{ backgroundColor: '#d4f5b3' }}></div>
+            <div className="legend-color" style={{ backgroundColor: '#a7eb67' }}></div>
             <span>Niskie (&lt;40%)</span>
           </div>
           <div className="legend-item">
-            <div className="legend-color" style={{ backgroundColor: '#a7eb67' }}></div>
+            <div className="legend-color" style={{ backgroundColor: '#fbc02d' }}></div>
             <span>Średnie (40-60%)</span>
           </div>
           <div className="legend-item">
-            <div className="legend-color" style={{ backgroundColor: '#6b9c3d' }}></div>
+            <div className="legend-color" style={{ backgroundColor: '#f57c00' }}></div>
             <span>Wysokie (60-80%)</span>
           </div>
           <div className="legend-item">
-            <div className="legend-color" style={{ backgroundColor: '#2d5016' }}></div>
+            <div className="legend-color" style={{ backgroundColor: '#c62828' }}></div>
             <span>Krytyczne (≥80%)</span>
           </div>
         </div>
       </div>
     </div>
   );
-};
+});
+
+HeatMap.displayName = 'HeatMap';
 
 export default HeatMap;
