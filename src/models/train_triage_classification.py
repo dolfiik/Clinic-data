@@ -15,7 +15,7 @@ from imblearn.over_sampling import BorderlineSMOTE, ADASYN
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 from sklearn.utils.class_weight import compute_class_weight
 
 # Metryki
@@ -28,7 +28,8 @@ warnings.filterwarnings('ignore')
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
-DATA_PATH = Path('/home/dolfik/Projects/Clinic-data/data/processed/')
+# ✅ ZMIENIONE: Teraz ładujemy surowe dane
+DATA_PATH = Path('/home/dolfik/Projects/Clinic-data/data/raw/')
 MODEL_PATH = Path('/home/dolfik/Projects/Clinic-data/models/')
 RESULTS_PATH = Path('/home/dolfik/Projects/Clinic-data/results/')
 
@@ -62,7 +63,7 @@ def analyze_class_distribution(y, dataset_name="Dataset"):
     print(f"\n  Współczynnik nierównowagi: {imbalance_ratio:.2f}x")
     
     if imbalance_ratio > 3:
-        print(" UWAGA: Duża nierównowaga klas! Wymagany SMOTE/oversampling")
+        print("  UWAGA: Duża nierównowaga klas! Wymagany SMOTE/oversampling")
     
     return dict(zip(unique, counts))
 
@@ -200,12 +201,12 @@ def compare_models(results_dict):
     
     axes[-1].axis('off')  # Ukryj ostatni subplot
     
-    plt.suptitle('Porównanie modeli - wszystkie metryki (IMPROVED)', 
+    plt.suptitle('Porównanie modeli - wszystkie metryki (NO SCALING)', 
                  fontsize=14, fontweight='bold')
     plt.tight_layout()
     
     if SAVE_PLOTS:
-        filename = RESULTS_PATH / 'model_comparison_improved.png'
+        filename = RESULTS_PATH / 'model_comparison_no_scaling.png'
         plt.savefig(filename, dpi=300, bbox_inches='tight')
     
     plt.show()
@@ -220,13 +221,13 @@ def save_model(model, model_name, metrics):
     """Zapisuje model do pliku"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    model_filename = MODEL_PATH / f'{model_name.lower().replace(" ", "_")}_improved_{timestamp}.pkl'
+    model_filename = MODEL_PATH / f'{model_name.lower().replace(" ", "_")}_no_scaling_{timestamp}.pkl'
     with open(model_filename, 'wb') as f:
         pickle.dump(model, f)
     
     print(f"Model zapisany: {model_filename}")
     
-    metrics_filename = MODEL_PATH / f'{model_name.lower().replace(" ","_")}_improved_{timestamp}_metrics.json'
+    metrics_filename = MODEL_PATH / f'{model_name.lower().replace(" ","_")}_no_scaling_{timestamp}_metrics.json'
     with open(metrics_filename, 'w') as f:
         metrics_to_save = {
             'train': {k: v for k, v in metrics['train'].items() if k != 'predictions'},
@@ -241,45 +242,57 @@ def save_model(model, model_name, metrics):
 def main():
     """Główna funkcja trenująca model"""
     
-    print_header("Ulepszone trenowanie modelu triaży")
+    print_header("Trening modelu triaży - BEZ SKALOWANIA")
     print(f"Data rozpoczęcia: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # ========================================================================
-    # 1. WCZYTANIE DANYCH
+    # 1. WCZYTANIE I PREPROCESSING SUROWYCH DANYCH
     # ========================================================================
-    print_header("Wczytanie danych")
+    print_header("Wczytanie i preprocessing surowych danych")
     
     try:
-        X_train = pd.read_csv(DATA_PATH / 'X_train.csv')
-        X_val = pd.read_csv(DATA_PATH / 'X_val.csv')
-        X_test = pd.read_csv(DATA_PATH / 'X_test.csv')
+        # ✅ Wczytaj surowe dane
+        df = pd.read_csv(DATA_PATH / 'triage_data.csv')
+        print(f"✓ Wczytano {len(df)} rekordów surowych")
+        print(f"  Kolumny: {list(df.columns)}")
         
-        y_train = pd.read_csv(DATA_PATH / 'y_train.csv').values.ravel()
-        y_val = pd.read_csv(DATA_PATH / 'y_val.csv').values.ravel()
-        y_test = pd.read_csv(DATA_PATH / 'y_test.csv').values.ravel()
+        # Wydziel target
+        y = df['kategoria_triażu'].values
         
-        # Usuń kolumny tekstowe
-        text_columns = X_train.select_dtypes(include=['object']).columns.tolist()
-        if text_columns:
-            print(f"Usuwanie kolumn tekstowych: {text_columns}")
-            X_train = X_train.drop(columns=text_columns)
-            X_val = X_val.drop(columns=text_columns)
-            X_test = X_test.drop(columns=text_columns)
-            print(f"✓ Po czyszczeniu: {X_train.shape[1]} cech")
+        # Usuń kolumny które nie są cechami
+        X = df.drop(['kategoria_triażu', 'id_przypadku', 'data_przyjęcia', 'oddział_docelowy'], axis=1)
+        print(f"\n✓ Po usunięciu kolumn niebędących cechami: {X.shape[1]} kolumn")
         
-        # Konwersja do float
-        X_train = X_train.astype(float)
-        X_val = X_val.astype(float)
-        X_test = X_test.astype(float)
+        # One-hot encoding dla płci
+        X['płeć_M'] = (X['płeć'] == 'M').astype(int)
+        X = X.drop('płeć', axis=1)
         
-        print("\n✓ Dane wczytane pomyślnie")
+        # One-hot encoding dla szablonu przypadku
+        template_dummies = pd.get_dummies(X['szablon_przypadku'], prefix='szablon')
+        X = pd.concat([X.drop('szablon_przypadku', axis=1), template_dummies], axis=1)
+        
+        print(f"✓ Po one-hot encoding: {X.shape[1]} cech")
+        print(f"\nPrzykładowe cechy: {list(X.columns[:10])}")
+        
+        # ✅ SPLIT train/val/test BEZ SKALOWANIA
+        print("\n✓ Podział danych na train/val/test...")
+        X_temp, X_test, y_temp, y_test = train_test_split(
+            X, y, test_size=0.15, random_state=RANDOM_STATE, stratify=y
+        )
+        X_train, X_val, y_train, y_val = train_test_split(
+            X_temp, y_temp, test_size=0.176, random_state=RANDOM_STATE, stratify=y_temp
+        )
+        
         print(f"\nRozmiary zbiorów:")
         print(f"  Treningowy:  {X_train.shape[0]:>5} próbek × {X_train.shape[1]:>3} cech")
         print(f"  Walidacyjny: {X_val.shape[0]:>5} próbek × {X_val.shape[1]:>3} cech")
         print(f"  Testowy:     {X_test.shape[0]:>5} próbek × {X_test.shape[1]:>3} cech")
         
+        print("\n✅ DANE BEZ NORMALIZACJI (surowe wartości)")
+        print("   Model będzie trenowany i używany na tych samych wartościach!")
+        
     except FileNotFoundError as e:
-        print("\n Błąd: nie znaleziono plików z danymi")
+        print("\n❌ Błąd: nie znaleziono plików z danymi")
         print(f"   Szczegóły: {e}")
         return
     
@@ -290,20 +303,12 @@ def main():
     
     print_header("Balansowanie klas - SMOTETomek")
     
-    print(f"\n Przed balansowaniem: {X_train.shape[0]} próbek")
+    print(f"\n  Przed balansowaniem: {X_train.shape[0]} próbek")
     
-    # Wypróbuj różne metody balansowania
-    balancing_methods = {
-        'SMOTETomek': SMOTETomek(random_state=RANDOM_STATE),
-        'BorderlineSMOTE': BorderlineSMOTE(random_state=RANDOM_STATE, kind='borderline-1'),
-        'ADASYN': ADASYN(random_state=RANDOM_STATE)
-    }
-    
-    resampler = balancing_methods['SMOTETomek']
-    
+    resampler = SMOTETomek(random_state=RANDOM_STATE)
     X_train_balanced, y_train_balanced = resampler.fit_resample(X_train, y_train)
     
-    print(f" Po balansowaniu:  {X_train_balanced.shape[0]} próbek")
+    print(f"  Po balansowaniu:  {X_train_balanced.shape[0]} próbek")
     analyze_class_distribution(y_train_balanced, "Treningowy (po oversampling)")
     
     print_header("Obliczanie wag klas")
@@ -334,7 +339,7 @@ def main():
     
     rf_base = RandomForestClassifier(
         random_state=RANDOM_STATE,
-        n_jobs=-1,  # Użyj wszystkich rdzeni
+        n_jobs=-1,
         max_features='sqrt'
     )
     
@@ -351,6 +356,7 @@ def main():
     
     grid_search.fit(X_train_balanced, y_train_balanced)
     
+    print("\n  Najlepsze parametry:")
     for param, value in grid_search.best_params_.items():
         print(f"    {param}: {value}")
     print(f"  Best CV Score: {grid_search.best_score_:.4f}")
@@ -384,7 +390,7 @@ def main():
             ('lr', models['Logistic Regression'])
         ],
         voting='soft',
-        weights=[2, 2, 1],  # RF i GB mają większą wagę
+        weights=[2, 2, 1],
         n_jobs=-1
     )
     models['Ensemble (Weighted)'] = ensemble
@@ -424,13 +430,18 @@ def main():
     
     best_metrics = results[best_model_name]['test']
     
-    print(f"\n Metryki finalne na zbiorze testowym:")
+    print(f"\n  Metryki finalne na zbiorze testowym:")
     print(f"   Accuracy:          {best_metrics['accuracy']:.2%}")
     print(f"   Balanced Accuracy: {best_metrics['balanced_accuracy']:.2%}")
     print(f"   F1-Score:          {best_metrics['f1_score']:.2%}")
     
     print_header("Zapis modelu")
     save_model(best_model, best_model_name, results[best_model_name])
+    
+    print("\n" + "="*70)
+    print("✅ TRENING ZAKOŃCZONY - MODEL BEZ SKALOWANIA")
+    print("   Backend używa surowych danych → kompatybilny!")
+    print("="*70)
     
 if __name__ == "__main__":
     main()

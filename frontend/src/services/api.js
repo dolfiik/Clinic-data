@@ -87,6 +87,11 @@ export const getTriageStats = async () => {
   return response.data;
 };
 
+export const getAvailableTemplates = async () => {
+  const response = await api.get('/triage/templates');
+  return response.data;
+};
+
 // ============================================================================
 // DEPARTMENTS
 // ============================================================================

@@ -30,9 +30,6 @@ def generate_case(template_name, template):
     return case
 
 if __name__ == '__main__':
-    print("="*70)
-    print("GENEROWANIE DANYCH Z REALISTYCZNYM SZUMEM")
-    print("="*70)
     
     templates_by_dominant = {1: [], 2: [], 3: [], 4: [], 5: []}
     

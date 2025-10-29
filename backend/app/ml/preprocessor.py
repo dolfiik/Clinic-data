@@ -2,9 +2,7 @@ import sys
 from pathlib import Path
 import pandas as pd
 import numpy as np
-import pickle
 from typing import Dict, Any, Optional
-from datetime import datetime
 
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -13,151 +11,155 @@ from app.core.config import settings
 
 class TriagePreprocessor:
     """
-    Preprocessor dla danych pacjenta - przygotowuje dane dla modelu ML
+    Preprocessor dla modelu BEZ SKALOWANIA (26 cech)
+    Dopasowany do: random_forest_no_scaling_20251029_095044.pkl
     """
     
-    def __init__(self, scaler_path: Optional[str] = None):
+    def __init__(self):
         """Inicjalizacja preprocessora"""
-        self.scaler = None
-        self.scaler_path = scaler_path or str(Path(settings.MODEL_PATH) / 'scaler.pkl')
         
+        # ✅ 10 cech numerycznych - DOKŁADNIE jak w modelu
         self.numerical_features = [
             'wiek', 'tętno', 'ciśnienie_skurczowe', 'ciśnienie_rozkurczowe',
-            'temperatura', 'saturacja'
+            'temperatura', 'saturacja', 'GCS', 'ból', 
+            'częstotliwość_oddechów', 'czas_od_objawów_h'
         ]
         
+        # ✅ 15 szablonów - DOKŁADNIE jak w modelu
         self.templates = [
-            'ból_brzucha_łagodny',      
-            'infekcja_moczu',           
+            'ból_brzucha_łagodny',
+            'infekcja_moczu',
             'kontrola',
             'migrena',
             'przeziębienie',
             'receptura',
             'silne_krwawienie',
             'skręcenie_lekkie',
-            'udar_ciężki',              
+            'udar_ciężki',
             'uraz_wielonarządowy',
             'zaostrzenie_astmy',
-            'zapalenie_płuc_ciężkie',   
+            'zapalenie_płuc_ciężkie',
             'zapalenie_wyrostka',
-            'zawał_STEMI',              
-            'złamanie_proste'           
+            'zawał_STEMI',
+            'złamanie_proste'
         ]
         
-        self.departments = [
-            'Chirurgia', 'Interna', 'Kardiologia', 
-            'Neurologia', 'Ortopedia', 'SOR'
-        ]
-        
-        self._load_scaler()
+        print("✓ Preprocessor zainicjalizowany (26 cech, BEZ skalowania)")
     
-    def _load_scaler(self):
-        """Ładuje zapisany scaler"""
-        try:
-            scaler_path = Path(self.scaler_path)
-            if scaler_path.exists():
-                with open(scaler_path, 'rb') as f:
-                    self.scaler = pickle.load(f)
-                print(f"✓ Scaler załadowany z: {scaler_path}")
-            else:
-                print(f"⚠ Scaler nie znaleziony: {scaler_path}")
-                print("  Model będzie działał bez skalowania")
-                self.scaler = None  
-        except Exception as e:
-            print(f"⚠ Błąd ładowania scalera: {e}")
-            self.scaler = None   
-
     def _fill_missing_values(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Wypełnia brakujące wartości domyślnymi
-        
-        Args:
-            data: Słownik z danymi pacjenta
-            
-        Returns:
-            Dane z wypełnionymi wartościami
-        """
+        """Uzupełnia brakujące wartości domyślnymi"""
         defaults = {
+            'wiek': 50,
             'tętno': 75.0,
             'ciśnienie_skurczowe': 120.0,
             'ciśnienie_rozkurczowe': 80.0,
             'temperatura': 36.6,
-            'saturacja': 98.0
+            'saturacja': 98.0,
+            'GCS': 15,
+            'ból': 0,
+            'częstotliwość_oddechów': 16.0,
+            'czas_od_objawów_h': 1.0
         }
         
         filled_data = data.copy()
-        
-        for feature, default_value in defaults.items():
-            if feature not in filled_data or filled_data[feature] is None:
-                filled_data[feature] = default_value
+        for key, default_value in defaults.items():
+            if key not in filled_data or filled_data[key] is None:
+                filled_data[key] = default_value
         
         return filled_data
     
     def _normalize_template_name(self, template: Optional[str]) -> Optional[str]:
         """
-        Normalizuje nazwę szablonu do formatu oczekiwanego przez model
-        
-        Args:
-            template: Oryginalna nazwa szablonu
-            
-        Returns:
-            Znormalizowana nazwa lub None
+        Normalizuje nazwy szablonów do formatu oczekiwanego przez model
         """
         if not template:
             return None
         
+        # ✅ Mapowanie różnych wariantów
         template_mapping = {
-            'Ból brzucha': 'ból_brzucha_łagodny',
-            'Ból w klatce piersiowej': 'zawał_STEMI',
-            'bol_w_klatce': 'zawał_STEMI',
-            'bol_brzucha': 'ból_brzucha_łagodny',
-            'infekcja_ukladu_moczowego': 'infekcja_moczu',
-            'udar': 'udar_ciężki',
-            'zapalenie_pluc': 'zapalenie_płuc_ciężkie',
-            'zlamanie_konczyny': 'złamanie_proste',
+            # Dokładne dopasowania
+            'zawał_STEMI': 'zawał_STEMI',
+            'ból_brzucha_łagodny': 'ból_brzucha_łagodny',
+            'infekcja_moczu': 'infekcja_moczu',
+            'udar_ciężki': 'udar_ciężki',
+            'zapalenie_płuc_ciężkie': 'zapalenie_płuc_ciężkie',
+            'złamanie_proste': 'złamanie_proste',
+            'uraz_wielonarządowy': 'uraz_wielonarządowy',
+            'przeziębienie': 'przeziębienie',
+            'kontrola': 'kontrola',
+            'receptura': 'receptura',
+            'skręcenie_lekkie': 'skręcenie_lekkie',
             'migrena': 'migrena',
             'silne_krwawienie': 'silne_krwawienie',
             'zaostrzenie_astmy': 'zaostrzenie_astmy',
             'zapalenie_wyrostka': 'zapalenie_wyrostka',
-            'uraz_wielonarzadowy': 'uraz_wielonarządowy'
-        }        
+            
+            # Bez polskich znaków -> z polskimi
+            'zawal_STEMI': 'zawał_STEMI',
+            'zawal_stemi': 'zawał_STEMI',
+            'bol_brzucha_lagodny': 'ból_brzucha_łagodny',
+            'bol_brzucha': 'ból_brzucha_łagodny',
+            'udar_ciezki': 'udar_ciężki',
+            'udar': 'udar_ciężki',
+            'zapalenie_pluc_ciezkie': 'zapalenie_płuc_ciężkie',
+            'zapalenie_pluc': 'zapalenie_płuc_ciężkie',
+            'zlamanie_proste': 'złamanie_proste',
+            'uraz_wielonarzadowy': 'uraz_wielonarządowy',
+            'przeziebienie': 'przeziębienie',
+            'skrecenie_lekkie': 'skręcenie_lekkie',
+            
+            # Alternatywne nazwy
+            'zawał': 'zawał_STEMI',
+            'udar mózgu': 'udar_ciężki',
+            'zapalenie płuc': 'zapalenie_płuc_ciężkie',
+            'złamanie': 'złamanie_proste',
+            'krwawienie': 'silne_krwawienie',
+            'astma': 'zaostrzenie_astmy',
+            'wyrostek': 'zapalenie_wyrostka',
+        }
+        
+        # Spróbuj mapowania
         if template in template_mapping:
-            return template_mapping[template]
+            mapped = template_mapping[template]
+            print(f"  📝 Mapowanie: '{template}' → '{mapped}'")
+            return mapped
         
-        normalized = template.lower().replace(' ', '_').replace('ł', 'l').replace('ą', 'a').replace('ę', 'e').replace('ć', 'c').replace('ń', 'n').replace('ó', 'o').replace('ś', 's').replace('ź', 'z').replace('ż', 'z')
+        # Sprawdź czy nazwa jest już poprawna
+        if template in self.templates:
+            print(f"  ✓ Szablon OK: '{template}'")
+            return template
         
-        if normalized in self.templates:
-            return normalized
-        
+        # Jeśli nie znaleziono
+        print(f"  ⚠ NIEZNANY szablon: '{template}'")
+        print(f"    Model będzie decydował TYLKO na parametrach życiowych!")
         return None
     
     def _create_numerical_dataframe(self, data: Dict[str, Any]) -> pd.DataFrame:
         """
-        Tworzy DataFrame z cechami numerycznymi
-        
-        Args:
-            data: Słownik z danymi pacjenta
-            
-        Returns:
-            DataFrame z cechami numerycznymi
+        Tworzy DataFrame z cechami numerycznymi (10 cech)
         """
+        # Mapowanie nazw z bazy na nazwy preprocessingu
         field_mapping = {
-        'tetno': 'tętno',
-        'cisnienie_skurczowe': 'ciśnienie_skurczowe',
-        'cisnienie_rozkurczowe': 'ciśnienie_rozkurczowe',
-        'bol': 'ból',
-        'czestotliwosc_oddechow': 'częstotliwość_oddechów',
-        'czas_od_objawow_h': 'czas_od_objawów_h'
+            'tetno': 'tętno',
+            'cisnienie_skurczowe': 'ciśnienie_skurczowe',
+            'cisnienie_rozkurczowe': 'ciśnienie_rozkurczowe',
+            'gcs': 'GCS',
+            'bol': 'ból',
+            'czestotliwosc_oddechow': 'częstotliwość_oddechów',
+            'czas_od_objawow_h': 'czas_od_objawów_h'
         }
         
+        # Przekształć klucze
         normalized_data = {}
         for key, value in data.items():
             new_key = field_mapping.get(key, key)
             normalized_data[new_key] = value
         
+        # Uzupełnij brakujące
         normalized_data = self._fill_missing_values(normalized_data)
-        numerical_data = {}
         
+        # Wybierz tylko cechy numeryczne
+        numerical_data = {}
         for feature in self.numerical_features:
             if feature in normalized_data:
                 value = normalized_data[feature]
@@ -169,17 +171,33 @@ class TriagePreprocessor:
                 numerical_data[feature] = 0.0
         
         df = pd.DataFrame([numerical_data])
+        return df
+    
+    def _one_hot_encode_gender(self, gender: str) -> pd.DataFrame:
+        """
+        One-hot encoding dla płci - JEDNA kolumna płeć_M
         
-        return df    
+        Args:
+            gender: Płeć (M lub K)
+            
+        Returns:
+            DataFrame z jedną kolumną płeć_M (1 jeśli M, 0 jeśli K)
+        """
+        encoded = {
+            'płeć_M': 1 if gender == 'M' else 0
+        }
+        
+        return pd.DataFrame([encoded])
+    
     def _one_hot_encode_template(self, template: Optional[str]) -> pd.DataFrame:
         """
-        One-hot encoding dla szablonu przypadku
+        One-hot encoding dla szablonu przypadku (15 kolumn)
         
         Args:
             template: Nazwa szablonu przypadku
             
         Returns:
-            DataFrame z kolumnami one-hot encoded
+            DataFrame z 15 kolumnami szablon_*
         """
         normalized_template = self._normalize_template_name(template)
         
@@ -191,55 +209,6 @@ class TriagePreprocessor:
         
         return pd.DataFrame([encoded])
     
-    def _one_hot_encode_gender(self, gender: str) -> pd.DataFrame:
-        """
-        One-hot encoding dla płci - JEDNA kolumna jak w modelu
-        
-        Args:
-            gender: Płeć (M lub K)
-            
-        Returns:
-            DataFrame z jedną kolumną płeć_encoded
-        """
-        encoded = {
-            'płeć_encoded': 1 if gender == 'M' else 0
-        }
-        
-        return pd.DataFrame([encoded])
-    
-    def _add_datetime_features(self) -> pd.DataFrame:
-        """
-        Dodaje cechy związane z czasem (godzina, dzień tygodnia, etc.)
-        
-        Returns:
-            DataFrame z cechami czasowymi
-        """
-        now = datetime.now()
-        
-        datetime_features = {
-            'godzina': now.hour,
-            'dzien_tygodnia': now.weekday(),
-            'miesiac': now.month,
-            'czy_weekend': 1 if now.weekday() >= 5 else 0
-        }
-        
-        return pd.DataFrame([datetime_features])
-    
-    def _one_hot_encode_departments(self) -> pd.DataFrame:
-        """
-        One-hot encoding dla oddziałów - wszystkie na 0 (nie znamy jeszcze oddziału docelowego)
-        
-        Returns:
-            DataFrame z kolumnami one-hot encoded dla oddziałów
-        """
-        encoded = {}
-        
-        for dept in self.departments:
-            col_name = f'oddział_{dept}'
-            encoded[col_name] = 0
-        
-        return pd.DataFrame([encoded])
-    
     def transform(self, patient_data: Dict[str, Any]) -> pd.DataFrame:
         """
         Przetwarza dane pacjenta do formatu gotowego dla modelu
@@ -248,38 +217,29 @@ class TriagePreprocessor:
             patient_data: Słownik z danymi pacjenta (surowe wartości)
             
         Returns:
-            DataFrame gotowy do predykcji
+            DataFrame gotowy do predykcji (26 cech)
         """
+        # 1. Cechy numeryczne (10 kolumn)
         df_numerical = self._create_numerical_dataframe(patient_data)
         
+        # 2. Płeć (1 kolumna: płeć_M)
         gender = patient_data.get('plec', 'M')
         df_gender = self._one_hot_encode_gender(gender)
         
-        df_datetime = self._add_datetime_features()
-        
-        df_departments = self._one_hot_encode_departments()
-        
+        # 3. Szablon (15 kolumn: szablon_*)
         template = patient_data.get('szablon_przypadku', None)
         df_template = self._one_hot_encode_template(template)
         
-        # ✅ Kolejność MUSI być zgodna z modelem!
+        # ✅ KOLEJNOŚĆ ZGODNA Z MODELEM!
+        # 10 numerical + 1 gender + 15 templates = 26 cech
         df_final = pd.concat([
-            df_numerical,      # wiek, tętno, ciśnienie_skurczowe, ciśnienie_rozkurczowe, temperatura, saturacja
-            df_gender,         # płeć_encoded
-            df_datetime,       # godzina, dzien_tygodnia, miesiac, czy_weekend
-            df_departments,    # oddział_*
-            df_template        # szablon_*
+            df_numerical,   # wiek, tętno, ..., czas_od_objawów_h
+            df_gender,      # płeć_M
+            df_template     # szablon_*
         ], axis=1)
         
-        if self.scaler is not None:
-            try:
-                df_final = pd.DataFrame(
-                    self.scaler.transform(df_final),
-                    columns=df_final.columns
-                )
-            except Exception as e:
-                print(f"⚠ Błąd skalowania: {e}")
-                print("  Kontynuuję bez skalowania...")
+        # ✅ BRAK SKALOWANIA - model trenowany na surowych wartościach!
+        print(f"✓ Preprocessing zakończony: {df_final.shape[1]} cech (BEZ skalowania)")
         
         return df_final
     
@@ -288,23 +248,17 @@ class TriagePreprocessor:
         Zwraca listę wszystkich nazw cech po preprocessingu
         
         Returns:
-            Lista nazw cech
+            Lista 26 nazw cech
         """
         features = []
         
-        # Numerical
+        # Numerical (10)
         features.extend(self.numerical_features)
         
-        # Gender
-        features.append('płeć_encoded')
+        # Gender (1)
+        features.append('płeć_M')
         
-        # Datetime
-        features.extend(['godzina', 'dzien_tygodnia', 'miesiac', 'czy_weekend'])
-        
-        # Departments
-        features.extend([f'oddział_{d}' for d in self.departments])
-        
-        # Templates
+        # Templates (15)
         features.extend([f'szablon_{t}' for t in self.templates])
         
         return features
@@ -336,7 +290,9 @@ class TriagePreprocessor:
             'cisnienie_skurczowe': (0, 300),
             'cisnienie_rozkurczowe': (0, 200),
             'temperatura': (30, 45),
-            'saturacja': (0, 100)
+            'saturacja': (0, 100),
+            'gcs': (3, 15),
+            'bol': (0, 10)
         }
         
         for field, (min_val, max_val) in ranges.items():
@@ -347,4 +303,5 @@ class TriagePreprocessor:
         
         return True, None
 
+# Singleton instance
 preprocessor = TriagePreprocessor()

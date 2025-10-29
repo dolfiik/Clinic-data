@@ -51,7 +51,16 @@ class TriagePredictor:
         
         try:
             X = preprocessor.transform(patient_data)
-            
+
+            print("\n🔬 WARTOŚCI PO PREPROCESSINGU (pierwsze 15 cech):")
+            for i, col in enumerate(X.columns[:15]):
+                print(f"  {col}: {X[col].values[0]:.4f}")
+
+            print("\n🔬 SZABLONY (które są = 1):")
+            for col in X.columns:
+                if col.startswith('szablon_') and X[col].values[0] > 0:
+                    print(f"  ✅ {col}: {X[col].values[0]:.4f}")
+                        
             print("\n📊 PREPROCESSED DATA:")
             print(f"  Shape: {X.shape}")
             print("\n  WSZYSTKIE cechy:")

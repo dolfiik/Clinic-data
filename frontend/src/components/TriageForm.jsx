@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createPatient, predictTriage } from '../services/api';
+import TemplateSelect from './TemplateSelect';
 
 const TriageForm = ({ onPredictionComplete }) => {
   const [formData, setFormData] = useState({
@@ -287,18 +288,14 @@ const TriageForm = ({ onPredictionComplete }) => {
 
             <div className="form-group">
               <label>Szablon przypadku (opcjonalnie)</label>
-              <input
-                type="text"
-                name="szablon_przypadku"
+              <TemplateSelect
                 value={formData.szablon_przypadku}
                 onChange={handleChange}
-                disabled={loading}
-                placeholder="np. udar, zawał"
-              />
-            </div>
-          </div>
-        </div>
-
+                name="szablon_przypadku"
+                required
+              />            </div>
+                        </div>
+                      </div>
         {error && (
           <div className="error-message">
             {error}

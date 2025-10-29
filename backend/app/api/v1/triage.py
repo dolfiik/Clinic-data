@@ -14,6 +14,7 @@ from app.schemas import (
 from app.services import TriageService
 from app.ml.predictor import predictor
 from app.models import User
+from typing import List, Dict
 
 router = APIRouter()
 
@@ -297,3 +298,35 @@ async def get_categories_info(
             }
         ]
     }
+
+@router.get("/templates", response_model=List[Dict[str, str]])
+async def get_available_templates():
+    """Zwraca listę dostępnych szablonów przypadków medycznych"""
+    from app.ml.preprocessor import preprocessor
+    
+    template_labels = {
+        'ból_brzucha_łagodny': 'Ból brzucha (łagodny)',
+        'infekcja_moczu': 'Infekcja układu moczowego',
+        'kontrola': 'Kontrola / Badanie kontrolne',
+        'migrena': 'Migrena / Ból głowy',
+        'przeziębienie': 'Przeziębienie / Infekcja górnych dróg oddechowych',
+        'receptura': 'Wypisanie recepty / Przedłużenie leczenia',
+        'silne_krwawienie': 'Silne krwawienie',
+        'skręcenie_lekkie': 'Skręcenie / Zwichnięcie (lekkie)',
+        'udar_ciężki': 'Udar mózgu (ciężki)',
+        'uraz_wielonarządowy': 'Uraz wielonarządowy / Wypadek',
+        'zaostrzenie_astmy': 'Zaostrzenie astmy / Duszność',
+        'zapalenie_płuc_ciężkie': 'Zapalenie płuc (ciężkie)',
+        'zapalenie_wyrostka': 'Zapalenie wyrostka robaczkowego',
+        'zawał_STEMI': 'Zawał serca (STEMI) / Ból w klatce piersiowej',
+        'złamanie_proste': 'Złamanie kości (proste)'
+    }
+    
+    templates = []
+    for template_value in preprocessor.templates:
+        templates.append({
+            "value": template_value,
+            "label": template_labels.get(template_value, template_value)
+        })
+    
+    return templates

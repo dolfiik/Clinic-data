@@ -1,0 +1,61 @@
+CECHY MODELU
+================================================================================
+
+ODDZIAŁY:
+  - Chirurgia
+  - Interna
+  - Kardiologia
+  - Neurologia
+  - Ortopedia
+  - SOR
+
+SZABLONY:
+  - ból_brzucha_łagodny
+  - infekcja_moczu
+  - kontrola
+  - migrena
+  - przeziębienie
+  - receptura
+  - silne_krwawienie
+  - skręcenie_lekkie
+  - udar_ciężki
+  - uraz_wielonarządowy
+  - zaostrzenie_astmy
+  - zapalenie_płuc_ciężkie
+  - zapalenie_wyrostka
+  - zawał_STEMI
+  - złamanie_proste
+
+Wszystkie cechy po kolei:
+  - wiek
+  - tętno
+  - ciśnienie_skurczowe
+  - ciśnienie_rozkurczowe
+  - temperatura
+  - saturacja
+  - płeć_encoded
+  - godzina
+  - dzien_tygodnia
+  - miesiac
+  - czy_weekend
+  - oddział_Chirurgia
+  - oddział_Interna
+  - oddział_Kardiologia
+  - oddział_Neurologia
+  - oddział_Ortopedia
+  - oddział_SOR
+  - szablon_ból_brzucha_łagodny
+  - szablon_infekcja_moczu
+  - szablon_kontrola
+  - szablon_migrena
+  - szablon_przeziębienie
+  - szablon_receptura
+  - szablon_silne_krwawienie
+  - szablon_skręcenie_lekkie
+  - szablon_udar_ciężki
+  - szablon_uraz_wielonarządowy
+  - szablon_zaostrzenie_astmy
+  - szablon_zapalenie_płuc_ciężkie
+  - szablon_zapalenie_wyrostka
+  - szablon_zawał_STEMI
+  - szablon_złamanie_proste

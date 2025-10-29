@@ -14,6 +14,7 @@ class ModelLoader:
     def load_latest_model(self) -> any:
         """
         Ładuje najnowszy model z folderu models/
+        Najpierw szuka best_model.pkl, potem najnowszego .pkl
         
         Returns:
             Załadowany model
@@ -26,13 +27,19 @@ class ModelLoader:
         if not model_dir.exists():
             raise FileNotFoundError(f"Model directory not found: {model_dir}")
         
-        # Znajdź najnowszy model Random Forest
-        rf_models = list(model_dir.glob("random_forest*.pkl"))
-        
-        if not rf_models:
-            raise FileNotFoundError(f"No Random Forest models found in {model_dir}")
-        
-        latest_model = max(rf_models, key=lambda p: p.stat().st_mtime)
+        best_model_path = model_dir / "best_model.pkl"
+        if best_model_path.exists():
+            latest_model = best_model_path
+            print(f"✓ Znaleziono best_model.pkl")
+        else:
+            all_models = list(model_dir.glob("*.pkl"))
+            
+            if not all_models:
+                raise FileNotFoundError(f"No models found in {model_dir}")
+            
+            # Wybierz najnowszy
+            latest_model = max(all_models, key=lambda p: p.stat().st_mtime)
+            print(f"Brak best_model.pkl, ładuję najnowszy: {latest_model.name}")
         
         print(f"Ładowanie modelu: {latest_model.name}")
         
@@ -41,24 +48,30 @@ class ModelLoader:
         
         self.model_path = latest_model
         
+        # Wersja modelu
         filename = latest_model.stem
-        parts = filename.split('_')
-        
-        if len(parts) >= 3:
-            date_part = parts[-2]
-            time_part = parts[-1]
-            self.model_version = f"rf_{date_part}_{time_part}"
+        if filename == "best_model":
+            self.model_version = "best_model"
         else:
-            self.model_version = filename
+            parts = filename.split('_')
+            if len(parts) >= 3:
+                date_part = parts[-2]
+                time_part = parts[-1]
+                self.model_version = f"{parts[0]}_{date_part}_{time_part}"
+            else:
+                self.model_version = filename
         
-        print(f"Model załadowany: {self.model_version}")
-        print(f"Typ: {type(self.model).__name__}")
+        print(f" Model załadowany: {self.model_version}")
+        print(f"  Typ: {type(self.model).__name__}")
         
         if hasattr(self.model, 'n_estimators'):
             print(f"  Liczba drzew: {self.model.n_estimators}")
+        elif hasattr(self.model, 'estimators_'):
+            print(f"  Liczba estimatorów: {len(self.model.estimators_)}")
         
-        return self.model
-    
+        return self.model    
+
+
     def load_specific_model(self, model_path: str) -> any:
         """
         Ładuje konkretny model
