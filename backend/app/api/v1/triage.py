@@ -20,6 +20,8 @@ from app.ml.predictor import predictor
 from app.models import User
 from typing import List, Dict
 
+from app.services.orchestrator_service import TriageOrchestrator
+
 router = APIRouter()
 
 def get_ip_address(request: Request) -> str:
@@ -340,29 +342,13 @@ async def get_available_templates():
 @router.post("/preview", response_model=TriagePreviewResponse)
 async def preview_triage(
     preview_request: TriagePreviewRequest,
+    db: Session = Depends(get_db),  
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Podgląd predykcji triaży BEZ tworzenia pacjenta
-    
-    **Wymaga:** Bearer Token
-    
-    **Parametry:**
-    - Wszystkie dane pacjenta (wiek, płeć, parametry vitalne)
-    
-    **Zwraca:**
-    - Przewidywaną kategorię triaży (1-5)
-    - Prawdopodobieństwa dla każdej kategorii
-    - Sugerowany oddział
-    - Pewność predykcji
-    - Listę dostępnych oddziałów (do wyboru)
-    - Opis kategorii i priorytetu
-    
-    **UWAGA:** Ta operacja NIE tworzy pacjenta w bazie!
-    Jest to tylko podgląd predykcji ML.
+    Podgląd predykcji - UŻYWA WSZYSTKICH 3 MODELI
     """
-    return TriageService.preview_triage(preview_request)
-
+    return TriageOrchestrator.predict_full(db, preview_request)
 
 @router.post("/confirm", response_model=TriageConfirmResponse, status_code=201)
 async def confirm_and_create_patient(
@@ -378,8 +364,8 @@ async def confirm_and_create_patient(
     
     **Parametry:**
     - Wszystkie dane pacjenta
-    - kategoria_triazu: Potwierdzona kategoria (może być zmieniona!)
-    - przypisany_oddzial: Potwierdzony oddział (może być zmieniony!)
+    - kategoria_triazu: Potwierdzona kategoria (może być zmieniona)
+    - przypisany_oddzial: Potwierdzony oddział (może być zmieniony)
     
     **Zwraca:**
     - ID utworzonego pacjenta

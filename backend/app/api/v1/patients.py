@@ -276,3 +276,28 @@ async def search_patients(
     - Lista znalezionych pacjentów
     """
     return PatientService.search_patients(db, q, limit)
+
+
+@router.get("/{patient_id}/current-location")
+async def get_patient_location(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Patient Tracker - zwraca obecną lokalizację pacjenta"""
+    from app.services import PatientService
+    
+    patient = PatientService.get_patient(db, patient_id)
+    
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    
+    return {
+        "patient_id": patient.id,
+        "wiek": patient.wiek,
+        "plec": patient.plec,
+        "kategoria_triazu": patient.prediction.kategoria_triazu if patient.prediction else None,
+        "przypisany_oddzial": patient.prediction.przypisany_oddzial if patient.prediction else None,
+        "data_przyjecia": patient.data_przyjecia,
+        "status": patient.status
+    }

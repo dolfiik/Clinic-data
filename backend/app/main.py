@@ -4,6 +4,9 @@ from app.core.config import settings
 from app.api.v1 import auth, patients, triage, departments, users, audit
 from sqlalchemy import text
 from app.middleware import setup_exception_handlers, setup_logging_middleware
+from datetime import datetime
+
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -190,23 +193,29 @@ async def internal_error_handler(request, exc):
 
 @app.on_event("startup")
 async def startup_event():
-    
+    """Wczytaj wszystkie modele przy starcie aplikacji"""
     from app.ml.predictor import predictor
-    if predictor.model:
-        print(f"ML Model loaded: {predictor.model_version}")
-    else:
-        print(" ML Model not loaded - predictions will not be available")
+    from app.services.occupancy_service import occupancy_predictor
+    from app.services.allocation_service import allocation_predictor
     
-    from app.core.database import engine
+    print(" STARTUP - Wczytywanie modeli ML...")
+    
+        
+    # Model 2 - Occupancy (LSTM)
     try:
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-        print("Database connection: OK")
+        occupancy_predictor.load_model()
+        print(f" Model 2 (Occupancy) - v{occupancy_predictor.model_version}")
     except Exception as e:
-        print(f"Database connection: FAILED - {e}")
+        print(f"  Model 2 (Occupancy) NIE załadowany: {e}")
     
-    print(f"API Documentation: http://localhost:8000/docs")
-    print(f"ReDoc: http://localhost:8000/redoc")
+    # Model 3 - Allocation
+    try:
+        allocation_predictor.load_model()
+        print(f" Model 3 (Allocation) - v{allocation_predictor.model_version}")
+    except Exception as e:
+        print(f"  Model 3 (Allocation) NIE załadowany: {e}")
+    
+    print(" Startup complete")
 
 @app.on_event("shutdown")
 async def shutdown_event():

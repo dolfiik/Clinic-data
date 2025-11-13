@@ -17,11 +17,11 @@ api.interceptors.request.use((config) => {
   } 
   return config;
 });
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token wygasł lub nieprawidłowy - wyloguj
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       //window.location.reload();
@@ -112,7 +112,6 @@ export const confirmAndCreatePatient = async (confirmData) => {
   return response.data;
 };
 
-
 // ============================================================================
 // DEPARTMENTS
 // ============================================================================
@@ -128,6 +127,39 @@ export const getDepartmentOccupancy = async () => {
  */
 export const refreshDepartmentOccupancy = async () => {
   const response = await api.get('/departments/occupancy');
+  return response.data;
+};
+
+/**
+ * Pobiera prognozy obłożenia oddziałów (za 1h, 3h, 6h)
+ * @returns {Promise} Prognozy dla wszystkich oddziałów
+ */
+export const getOccupancyForecast = async () => {
+  const response = await api.get('/departments/occupancy/forecast');
+  return response.data;
+};
+
+// ============================================================================
+// PATIENT TRACKING
+// ============================================================================
+
+/**
+ * Pobiera aktualną lokalizację pacjenta (na jakim oddziale)
+ * @param {number} patientId - ID pacjenta
+ * @returns {Promise} Informacje o pacjencie i jego lokalizacji
+ */
+export const getPatientLocation = async (patientId) => {
+  const response = await api.get(`/patients/${patientId}/current-location`);
+  return response.data;
+};
+
+/**
+ * Pobiera pełne szczegóły pacjenta
+ * @param {number} patientId - ID pacjenta
+ * @returns {Promise} Wszystkie dane pacjenta
+ */
+export const getPatientDetails = async (patientId) => {
+  const response = await api.get(`/patients/${patientId}`);
   return response.data;
 };
 

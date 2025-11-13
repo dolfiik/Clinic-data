@@ -332,3 +332,20 @@ async def get_department_recommendations(
         "recommendations": recommendations,
         "alternative_departments": alternatives if alternatives else None
     }
+
+
+@router.get("/occupancy/forecast")
+async def get_occupancy_forecast(
+    hours_ahead: int = Query(3, ge=1, le=6),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Pobiera prognozy obłożenia (Model 2 - LSTM)"""
+    from app.services.occupancy_service import OccupancyService
+    
+    try:
+        return OccupancyService.get_forecast(db, hours_ahead=hours_ahead)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")

@@ -28,7 +28,6 @@ warnings.filterwarnings('ignore')
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
-# ✅ ZMIENIONE: Teraz ładujemy surowe dane
 DATA_PATH = Path('/home/dolfik/Projects/Clinic-data/data/raw/')
 MODEL_PATH = Path('/home/dolfik/Projects/Clinic-data/models/')
 RESULTS_PATH = Path('/home/dolfik/Projects/Clinic-data/results/')

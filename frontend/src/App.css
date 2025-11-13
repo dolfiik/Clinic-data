@@ -692,3 +692,65 @@ body {
     padding: 24px;
   }
 }
+
+/* ============================================================================
+   NAV TABS 
+   ============================================================================ */
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.nav-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.nav-tab {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  background-color: transparent;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-tab:hover {
+  background-color: #f5f5f5;
+  border-color: #1976d2;
+  color: #1976d2;
+}
+
+.nav-tab.active {
+  background-color: #1976d2;
+  border-color: #1976d2;
+  color: #ffffff;
+}
+
+/* ============================================================================
+   TRACKER VIEW
+   ============================================================================ */
+
+.tracker-view {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+/* ============================================================================
+   LOADING FORECAST
+   ============================================================================ */
+
+.loading-forecast {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+  font-size: 14px;
+  font-style: italic;
+}
