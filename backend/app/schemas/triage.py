@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict
 from datetime import datetime
 from decimal import Decimal
+from typing import Optional, List, Any
 
 class TriagePredictionBase(BaseModel):
     """Bazowe pola predykcji"""
@@ -20,15 +21,14 @@ class TriagePredictionCreate(TriagePredictionBase):
     model_version: str
     confidence_score: Decimal = Field(..., ge=0, le=1)
 
-class TriagePredictionResponse(TriagePredictionBase):
-    """Schema odpowiedzi predykcji"""
-    id: int
-    patient_id: int
-    probabilities: Dict[str, float] = Field(..., description="Prawdopodobieństwa dla każdej kategorii")
-    model_version: str
-    confidence_score: float
-    predicted_at: datetime
-    
+class TriagePredictionResponse(BaseModel):
+    """Response z predykcją z bazy danych"""
+    kategoria_triazu: int
+    probabilities: Optional[Dict[str, float]] = None
+    przypisany_oddzial: str
+    confidence_score: Optional[float] = None
+    model_version: Optional[str] = None    
+
     class Config:
         from_attributes = True
 
@@ -39,11 +39,11 @@ class TriagePredictRequest(BaseModel):
 class TriagePredictResponse(BaseModel):
     """Odpowiedź z predykcją"""
     patient_id: int
-    kategoria_triazu: int
-    probabilities: Dict[str, float]
-    przypisany_oddzial: str
-    confidence_score: float
-    model_version: str
+    kategoria_triazu: Optional[int]
+    probabilities: Optional[Dict[str, float]]
+    przypisany_oddzial: Optional[str]
+    confidence_score: Optional[float]
+    model_version: Optional[str]
 
 class TriageStatsResponse(BaseModel):
     """Statystyki triaży"""
@@ -106,10 +106,15 @@ class TriagePreviewResponse(BaseModel):
     confidence_score: float
     model_version: str
     
-    # Dodatkowe informacje dla użytkownika
-    priorytet: str  # "RESUSCYTACJA", "CIĘŻKI STAN", etc.
+    priorytet: str  
     opis_kategorii: str
-    dostepne_oddzialy: list[str]  # Lista wszystkich dostępnych oddziałów
+    dostepne_oddzialy: list[str]  
+
+    triage_confidence: Optional[float] = None
+    allocation_confidence: Optional[float] = None
+    alternatives: Optional[List[Dict[str, Any]]] = None
+    current_occupancy: Optional[Dict[str, Any]] = None
+    occupancy_forecast: Optional[List[Dict[str, Any]]] = None
 
 
 class TriageConfirmRequest(BaseModel):

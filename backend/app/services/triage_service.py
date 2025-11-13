@@ -394,7 +394,6 @@ class TriageService:
         Raises:
             HTTPException: Jeśli model nie działa
         """
-        # Przygotuj dane dla modelu
         patient_data = {
             "wiek": preview_request.wiek,
             "plec": preview_request.plec,
@@ -410,7 +409,6 @@ class TriageService:
             "szablon_przypadku": preview_request.szablon_przypadku
         }
         
-        # Wykonaj predykcję
         try:
             prediction_result = predictor.predict(patient_data)
         except Exception as e:
@@ -423,13 +421,11 @@ class TriageService:
         probabilities = prediction_result["probabilities"]
         confidence = prediction_result["confidence"]
         
-        # Określ sugerowany oddział
         if preview_request.szablon_przypadku and preview_request.szablon_przypadku in TEMPLATE_TO_DEPARTMENT:
             assigned_department = TEMPLATE_TO_DEPARTMENT[preview_request.szablon_przypadku]
         else:
             assigned_department = CATEGORY_TO_DEPARTMENT.get(category, "SOR")
         
-        # Przygotuj opis kategorii
         category_descriptions = {
             1: "NATYCHMIASTOWY - Resuscytacja, zagrożenie życia",
             2: "PILNY - Bardzo pilny, ciężki stan",
@@ -446,7 +442,6 @@ class TriageService:
             5: "BARDZO NISKI"
         }
         
-        # Lista wszystkich dostępnych oddziałów
         available_departments = list(DEPARTMENT_CAPACITY.keys())
         
         return TriagePreviewResponse(
@@ -482,11 +477,9 @@ class TriageService:
         Raises:
             HTTPException: W przypadku błędów
         """
-        # Najpierw zrób predykcję żeby mieć oryginalne wartości
         preview_request = TriagePreviewRequest(**confirm_request.model_dump(exclude={'kategoria_triazu', 'przypisany_oddzial'}))
         original_prediction = TriageService.preview_triage(preview_request)
         
-        # Sprawdź czy wartości zostały zmienione
         was_modified = (
             confirm_request.kategoria_triazu != original_prediction.kategoria_triazu or
             confirm_request.przypisany_oddzial != original_prediction.przypisany_oddzial
@@ -530,7 +523,6 @@ class TriageService:
         
         db.add(prediction)
         
-        # KLUCZOWE: Zaktualizuj obłożenie oddziału
         TriageService._increment_department_occupancy(
             db=db,
             department=confirm_request.przypisany_oddzial

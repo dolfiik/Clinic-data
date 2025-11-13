@@ -3,6 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel
 from pydantic import Field
+from app.schemas.triage import TriagePredictionResponse
 
 class PatientBase(BaseModel):
     """Bazowe pola pacjenta"""
@@ -81,3 +82,6 @@ class PatientWithDetails(PatientResponse):
     class Config:
         from_attributes = True
 
+
+
+PatientWithPrediction.model_rebuild()
